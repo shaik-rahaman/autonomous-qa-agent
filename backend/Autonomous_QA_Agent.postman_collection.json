@@ -1,0 +1,618 @@
+{
+  "info": {
+    "_postman_id": "autonomous-qa-agent-api",
+    "name": "Autonomous QA Agent Backend API",
+    "description": "API collection for Autonomous QA Agent - Backend for converting English test cases to Playwright TypeScript scripts",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "Health & Info",
+      "item": [
+        {
+          "name": "Root Endpoint",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                ""
+              ]
+            },
+            "description": "Get API information and available endpoints"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    ""
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"name\": \"Autonomous QA Agent Backend\",\n  \"version\": \"1.0.0\",\n  \"description\": \"Convert English test cases to Playwright TypeScript scripts\",\n  \"endpoints\": {\n    \"health\": \"GET /api/health\",\n    \"generateTest\": \"POST /api/generate-test\",\n    \"listTests\": \"GET /api/tests\",\n    \"getTest\": \"GET /api/tests/:fileName\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/health",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "health"
+              ]
+            },
+            "description": "Health check endpoint to verify server is running"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/api/health",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "health"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-04-14T08:00:00.000Z\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Test Generation",
+      "item": [
+        {
+          "name": "Generate Test - Login Example",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Response status is 200\", function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has required fields\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('fileName');",
+                  "    pm.expect(jsonData).to.have.property('code');",
+                  "    pm.expect(jsonData).to.have.property('timestamp');",
+                  "    pm.expect(jsonData).to.have.property('version');",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains Playwright code\", function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.include('import');",
+                  "    pm.expect(jsonData.code).to.include('test');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testSteps\": \"1. Open login page 2. Enter username testuser@example.com 3. Enter password TestPassword123 4. Click login button 5. Wait for dashboard to load\",\n  \"url\": \"http://example.com/login\",\n  \"context\": {}\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/generate-test",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "generate-test"
+              ]
+            },
+            "description": "Generate Playwright test script from English test steps - Login example"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"testSteps\": \"1. Open login page 2. Enter username testuser@example.com 3. Enter password TestPassword123 4. Click login button 5. Wait for dashboard to load\",\n  \"url\": \"http://example.com/login\",\n  \"context\": {}\n}"
+                },
+                "url": {
+                  "raw": "http://localhost:3000/api/generate-test",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "generate-test"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"fileName\": \"open-login-page_v1.spec.ts\",\n  \"code\": \"import { test, expect, Page } from '@playwright/test';\\nimport { navigateTo, login, fillForm } from '../helpers';\\n\\ntest.describe('Generated Test Suite', () => {\\n  let page: Page;\\n\\n  test.beforeEach(async ({ page: testPage }) => {\\n    page = testPage;\\n  });\\n\\n  test('should complete the user workflow', async () => {\\n    // Test steps:\\n    // Step 1: Open login page\\n    // Step 2: Enter username testuser@example.com\\n    // Step 3: Enter password TestPassword123\\n    // Step 4: Click login button\\n    // Step 5: Wait for dashboard to load\\n\\n    // Navigation\\n    await navigateTo(page, 'http://example.com/login');\\n\\n    // Interactions\\n    await login(page, 'testuser@example.com', 'TestPassword123');\\n    await page.waitForNavigation();\\n\\n    // Assertions\\n    await expect(page).toHaveURL(/dashboard/);\\n  });\\n});\",\n  \"timestamp\": \"2026-04-14T08:00:00.000Z\",\n  \"version\": 1\n}"
+            }
+          ]
+        },
+        {
+          "name": "Generate Test - Dashboard Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testSteps\": \"1. Navigate to dashboard 2. Search for laptop 3. Click on first result 4. Add to cart 5. Proceed to checkout 6. Verify order summary\",\n  \"url\": \"http://example.com/dashboard\",\n  \"context\": {}\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/generate-test",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "generate-test"
+              ]
+            },
+            "description": "Generate Playwright test script - Dashboard/Shopping example"
+          }
+        },
+        {
+          "name": "Generate Test - Form Submission Example",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testSteps\": \"1. Open registration form 2. Enter first name John 3. Enter last name Doe 4. Enter email john@example.com 5. Fill phone number 6. Accept terms 7. Click submit 8. Verify success message\",\n  \"url\": \"http://example.com/register\",\n  \"context\": {\n    \"userType\": \"premium\"\n  }\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/generate-test",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "generate-test"
+              ]
+            },
+            "description": "Generate Playwright test script - Form submission example"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test Management",
+      "item": [
+        {
+          "name": "List All Generated Tests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/tests",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "tests"
+              ]
+            },
+            "description": "List all generated test files with metadata"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/api/tests",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "tests"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"count\": 3,\n  \"tests\": [\n    {\n      \"fileName\": \"open-login-page_v1.spec.ts\",\n      \"version\": 1,\n      \"timestamp\": \"2026-04-14T08:00:00.000Z\",\n      \"url\": \"http://example.com/login\"\n    },\n    {\n      \"fileName\": \"navigate-to-dashboard_v1.spec.ts\",\n      \"version\": 1,\n      \"timestamp\": \"2026-04-14T08:15:00.000Z\",\n      \"url\": \"http://example.com/dashboard\"\n    },\n    {\n      \"fileName\": \"open-registration-form_v1.spec.ts\",\n      \"version\": 1,\n      \"timestamp\": \"2026-04-14T08:30:00.000Z\",\n      \"url\": \"http://example.com/register\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Specific Test File",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/tests/open-login-page_v1.spec.ts",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "tests",
+                "open-login-page_v1.spec.ts"
+              ]
+            },
+            "description": "Retrieve a specific generated test file with full code"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/api/tests/open-login-page_v1.spec.ts",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "tests",
+                    "open-login-page_v1.spec.ts"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"fileName\": \"open-login-page_v1.spec.ts\",\n  \"version\": 1,\n  \"timestamp\": \"2026-04-14T08:00:00.000Z\",\n  \"url\": \"http://example.com/login\",\n  \"code\": \"import { test, expect, Page } from '@playwright/test';\\nimport { navigateTo, login, fillForm } from '../helpers';\\n\\ntest.describe('Generated Test Suite', () => {\\n  let page: Page;\\n\\n  test.beforeEach(async ({ page: testPage }) => {\\n    page = testPage;\\n  });\\n\\n  test('should complete the user workflow', async () => {\\n    // Test steps:\\n    // Step 1: Open login page\\n    // Step 2: Enter username testuser@example.com\\n    // Step 3: Enter password TestPassword123\\n    // Step 4: Click login button\\n    // Step 5: Wait for dashboard to load\\n\\n    // Navigation\\n    await navigateTo(page, 'http://example.com/login');\\n\\n    // Interactions\\n    await login(page, 'testuser@example.com', 'TestPassword123');\\n    await page.waitForNavigation();\\n\\n    // Assertions\\n    await expect(page).toHaveURL(/dashboard/);\\n  });\\n});\"\n}"
+            }
+          ]
+        }
+      ]    },
+    {
+      "name": "Test Execution",
+      "item": [
+        {
+          "name": "Execute Test File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"open-login-page_v1.spec.ts\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/execute",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "execute"
+              ]
+            },
+            "description": "Execute a generated Playwright test file and get results"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"fileName\": \"open-login-page_v1.spec.ts\"\n}"
+                },
+                "url": {
+                  "raw": "http://localhost:3000/api/execute",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "execute"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"exec-1713091200000-abc123def\",\n  \"testFile\": \"open-login-page_v1.spec.ts\",\n  \"status\": \"passed\",\n  \"duration\": 5423,\n  \"results\": {\n    \"passed\": 1,\n    \"failed\": 0,\n    \"skipped\": 0,\n    \"total\": 1\n  },\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Execution Result",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/execution/exec-1713091200000-abc123def",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "execution",
+                "exec-1713091200000-abc123def"
+              ]
+            },
+            "description": "Get detailed execution result by ID"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/api/execution/exec-1713091200000-abc123def",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "execution",
+                    "exec-1713091200000-abc123def"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"exec-1713091200000-abc123def\",\n  \"testFile\": \"open-login-page_v1.spec.ts\",\n  \"status\": \"passed\",\n  \"startTime\": \"2026-04-14T09:00:00.000Z\",\n  \"endTime\": \"2026-04-14T09:00:05.423Z\",\n  \"duration\": 5423,\n  \"results\": {\n    \"passed\": 1,\n    \"failed\": 0,\n    \"skipped\": 0,\n    \"total\": 1\n  },\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Execution Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/execution/exec-1713091200000-abc123def/logs",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "execution",
+                "exec-1713091200000-abc123def",
+                "logs"
+              ]
+            },
+            "description": "Get detailed logs for a test execution including stdout and stderr"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/api/execution/exec-1713091200000-abc123def/logs",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "execution",
+                    "exec-1713091200000-abc123def",
+                    "logs"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"exec-1713091200000-abc123def\",\n  \"logs\": \"Execution ID: exec-1713091200000-abc123def\\nTest File: open-login-page_v1.spec.ts\\nStatus: passed\\nDuration: 5423ms\\nResults: 1 passed, 0 failed, 0 skipped\\n\\n--- STDOUT ---\\nRunning 1 test...\\n✓ should complete the user workflow\\n\\n--- STDERR ---\\n\",\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Recent Executions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/executions",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "api",
+                "executions"
+              ]
+            },
+            "description": "List recent test executions (up to 50)"
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/api/executions",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "api",
+                    "executions"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"count\": 2,\n  \"executions\": [\n    {\n      \"id\": \"exec-1713091200000-abc123def\",\n      \"testFile\": \"open-login-page_v1.spec.ts\",\n      \"status\": \"passed\",\n      \"startTime\": \"2026-04-14T09:00:00.000Z\",\n      \"endTime\": \"2026-04-14T09:00:05.423Z\",\n      \"duration\": 5423,\n      \"results\": {\n        \"passed\": 1,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"total\": 1\n      }\n    },\n    {\n      \"id\": \"exec-1713090600000-xyz789wst\",\n      \"testFile\": \"register-user-form_v1.spec.ts\",\n      \"status\": \"failed\",\n      \"startTime\": \"2026-04-14T08:50:00.000Z\",\n      \"endTime\": \"2026-04-14T08:50:08.231Z\",\n      \"duration\": 8231,\n      \"results\": {\n        \"passed\": 0,\n        \"failed\": 1,\n        \"skipped\": 0,\n        \"total\": 1\n      }\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "default"
+    },
+    {
+      "key": "api_version",
+      "value": "v1",
+      "type": "default"
+    }
+  ]
+}

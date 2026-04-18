@@ -1,0 +1,138 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply border-dark-border;
+}
+
+html {
+  @apply bg-dark-bg text-dark-text;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  @apply m-0 p-0 antialiased;
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-dark-card;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-dark-border rounded hover:bg-gray-500;
+}
+
+/* Input and Textarea Focus States */
+input:focus,
+textarea:focus,
+select:focus {
+  @apply outline-none ring-2 ring-blue-500/50;
+}
+
+/* Code Block */
+.code-block {
+  @apply bg-dark-card border border-dark-border rounded p-4 font-mono text-sm overflow-x-auto;
+}
+
+/* Button Base Styles */
+button {
+  @apply transition-all duration-200 ease-out;
+}
+
+button:not(:disabled):hover {
+  @apply transform -translate-y-0.5;
+}
+
+button:disabled {
+  @apply opacity-60 cursor-not-allowed;
+}
+
+/* Spinners and Animations */
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth Scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selection Styling */
+::selection {
+  @apply bg-blue-600/50 text-white;
+}

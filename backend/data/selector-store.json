@@ -1,0 +1,345 @@
+[
+  {
+    "step": "learning-cycle-test.spec.ts",
+    "url": "https://learn.example.com",
+    "originalSelector": "#learn-btn-old",
+    "healedSelector": "[aria-label=\"learn-button\"]",
+    "createdAt": 1776226371614
+  },
+  {
+    "step": "test-new-entry.spec.ts",
+    "url": "https://test.example.com",
+    "originalSelector": ".test-selector-final",
+    "healedSelector": "[data-testid=\"final-test-selector\"]",
+    "createdAt": 1776226371613
+  },
+  {
+    "step": "login.spec.ts",
+    "url": "https://example.com",
+    "originalSelector": "#old-button",
+    "healedSelector": "#new-button",
+    "createdAt": 1776225111554
+  },
+  {
+    "step": "dashboard.spec.ts",
+    "url": "https://example.com",
+    "originalSelector": "[name=\"search\"]",
+    "healedSelector": "[data-testid=\"search-box\"]",
+    "createdAt": 1776225111554
+  },
+  {
+    "step": "login-form.spec.ts",
+    "url": "https://login.example.com",
+    "originalSelector": "#signin-btn",
+    "healedSelector": "[data-test=\"signin-button\"]",
+    "createdAt": 1776225483463
+  },
+  {
+    "step": "checkout-flow.spec.ts",
+    "url": "https://shop.example.com",
+    "originalSelector": ".checkout-button",
+    "healedSelector": "[aria-label=\"proceed-checkout\"]",
+    "createdAt": 1776225483463
+  },
+  {
+    "step": "auth/login.spec.ts",
+    "url": "https://app.example.com/login",
+    "originalSelector": "#login-submit",
+    "healedSelector": "[data-testid=\"login-button\"]",
+    "createdAt": 1776225569850
+  },
+  {
+    "step": "payment/checkout.spec.ts",
+    "url": "https://app.example.com/checkout",
+    "originalSelector": ".pay-button",
+    "healedSelector": "[aria-label=\"pay-now\"]",
+    "createdAt": 1776225569851
+  },
+  {
+    "step": "account/profile.spec.ts",
+    "url": "https://app.example.com/profile",
+    "originalSelector": "#user-menu",
+    "healedSelector": "[data-menu=\"user\"]",
+    "createdAt": 1776225569852
+  },
+  {
+    "step": "demo-autolearning.spec.ts",
+    "url": "https://example.com",
+    "originalSelector": "#old-login-btn",
+    "healedSelector": "[data-testid=\"login-button\"]",
+    "createdAt": 1776225735216
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "http://leaftaps.com/opentaps/control/main",
+    "originalSelector": "asdfslogin",
+    "healedSelector": "getByRole('button', { name: /login/i })",
+    "createdAt": 1776270652846
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776275624870
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "text=CRM/SFA",
+    "createdAt": 1776277704081
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "login",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776312915346
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "login",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776313362816
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"CRM/SFA\")",
+    "createdAt": 1776313477981
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776315000735
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"CRM/SFA\")",
+    "createdAt": 1776315300997
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "login",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776315565678
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776331652176
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776332354876
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776477838350
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776477870885
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776478199692
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776478580465
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776479462011
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776479635799
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776481175561
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776481848823
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776483865506
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776484207031
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776484677227
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776485206244
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776485579331
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776486038363
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776486890602
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776487141070
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776490240014
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1776490396044
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776504114357
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776504689651
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776504972889
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776526373225
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776526921884
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776531660571
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776531763134
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776532411454
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776532502119
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776533070684
+  }
+]

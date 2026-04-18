@@ -1,0 +1,44 @@
+{
+  "name": "pw-ai-agents-backend",
+  "version": "1.0.0",
+  "description": "Autonomous QA Agent - Backend for converting English test cases to Playwright TypeScript scripts",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "dev:backend-only": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "playwright test",
+    "test:ui": "playwright test tests/ui",
+    "test:api": "playwright test tests/api",
+    "test:automation": "playwright test tests/automation",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.1.50",
+    "@langchain/groq": "^0.0.1",
+    "@langchain/openai": "^0.0.20",
+    "axios": "^1.6.0",
+    "chalk": "^5.3.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "groq-sdk": "^1.1.2",
+    "openai": "^6.34.0",
+    "playwright": "^1.59.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^25.5.2",
+    "concurrently": "^8.2.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}

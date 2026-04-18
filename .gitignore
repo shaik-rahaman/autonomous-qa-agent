@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+dist/
+build/
+coverage/
+test-results/
+playwright-report/
+.vscode/
+.DS_Store

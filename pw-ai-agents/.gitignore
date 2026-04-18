@@ -1,0 +1,15 @@
+node_modules/
+dist/
+
+# Playwright outputs
+playwright-report/
+test-results/
+downloads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+*.local
