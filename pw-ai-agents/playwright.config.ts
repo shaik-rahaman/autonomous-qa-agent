@@ -16,8 +16,8 @@ export default defineConfig({
   /* Fail the build on CI if tests are accidentally committed as `.only` */
   forbidOnly: !!process.env.CI,
 
-  /* Retry failed tests once on CI */
-  retries: process.env.CI ? 2 : 0,
+  /* Retry failed tests once on CI  */
+  retries: process.env.CI ? 1 : 0,
 
   /* Limit workers on CI to avoid resource contention */
   workers: process.env.CI ? 1 : undefined,
