@@ -136,6 +136,7 @@ export class ExecutorService {
       if (!fs.existsSync(tempReportDir)) fs.mkdirSync(tempReportDir, { recursive: true });
       
       const reportJsonFile = join(tempReportDir, `report-${executionId}.json`);
+      const reportLogFile = `${reportJsonFile}.log`;
       
       // Path to pw-ai-agents directory
       const pwAiAgentsDir = join(this.projectRoot, '..', 'pw-ai-agents');
@@ -144,8 +145,13 @@ export class ExecutorService {
       const chosenTestFile = testFile;
       const relativeTestPath = join('tests', 'ui', 'generated', 'scripts', chosenTestFile);
 
-      // Use multiple reporters: HTML for visual report, JSON for data, list for console output
-      const command = `npx playwright test "${relativeTestPath}" --reporter=html --reporter=json --reporter=list 2>&1 | tee "${reportJsonFile}.log"`;
+      // Command for headed mode execution with explicit config and output handling
+      // --headed: Force browser to be visible
+      // --workers=1: Single worker for better visibility of browser window
+      // --reporter=list: Console output
+      // --reporter=html: HTML report for debugging
+      // Don't use shell redirection - capture output programmatically for better error handling
+      const command = `npx playwright test "${relativeTestPath}" --headed --workers=1 --reporter=list --reporter=html`;
 
       logger.info(`📝 Execution: Running Playwright test from pw-ai-agents: ${relativeTestPath}`);
 
@@ -164,9 +170,20 @@ export class ExecutorService {
       }
 
       try {
-        // Prepare child environment. If runtime injection is requested, set
-        // NODE_OPTIONS to require the runtime injector and provide PW_OVERRIDE_MAP.
-        let childEnv = { ...process.env, PWDEBUG: '0' } as NodeJS.ProcessEnv;
+        // Prepare child environment with proper headed mode settings
+        let childEnv = { 
+          ...process.env,
+          PWDEBUG: '0',        // Disable Playwright debug mode (cleaner output)
+          HEADLESS: 'false',   // Ensure headed mode in config
+          DEBUG: '',           // Clear any debug flags that might hide browser
+        } as NodeJS.ProcessEnv;
+
+        // On Linux/X11 systems, ensure display is set for browser visibility
+        if (!childEnv.DISPLAY && process.platform === 'linux') {
+          childEnv.DISPLAY = ':0';  // Default X11 display
+          logger.debug(`🖥️  Set DISPLAY=${childEnv.DISPLAY} for X11 browser rendering`);
+        }
+
         if (useRuntimeInject && options?.overrideSelector) {
           try {
             const injectorPath = path.resolve(this.projectRoot, 'dist', 'execution', 'runtime-injector.js');
@@ -192,9 +209,18 @@ export class ExecutorService {
           shell: '/bin/bash',
         });
 
+        logger.info(`🌐 Headed mode browser execution completed`);
+        logger.debug(`📋 Command: ${command}`);
+        logger.debug(`🖥️  Environment: HEADLESS=${childEnv.HEADLESS}, DISPLAY=${childEnv.DISPLAY || 'not set'}`);
+
         result.stdout = result_output.stdout;
         result.stderr = result_output.stderr;
         logger.debug(`Execution stdout: ${result.stdout?.substring(0, 200)}`);
+        
+        // Save output to report file for debugging
+        if (result.stdout) {
+          fs.writeFileSync(reportLogFile, `STDOUT:\n${result.stdout}\n\nSTDERR:\n${result.stderr || 'none'}`);
+        }
 
         // Parse JSON from file produced by Playwright JSON reporter
         const jsonPath = join(pwAiAgentsDir, 'playwright-report', 'index.json');
@@ -214,14 +240,18 @@ export class ExecutorService {
         result.status = result.failed === 0 ? 'passed' : 'failed';
         
         // Clean up temp files
-        if (fs.existsSync(`${reportJsonFile}.log`)) fs.unlinkSync(`${reportJsonFile}.log`);
+        if (fs.existsSync(reportLogFile)) fs.unlinkSync(reportLogFile);
         
         logger.success(
           `✓ Execution: Test completed (${result.passed} passed, ${result.failed} failed)`
         );
       } catch (error: any) {
+        logger.debug(`Execution error: ${error.message}`);
         result.stdout = error.stdout || '';
         result.stderr = error.stderr || '';
+        
+        // Save error output to report file for debugging
+        fs.writeFileSync(reportLogFile, `COMMAND_ERROR:\n${error.message}\n\nSTDOUT:\n${error.stdout || 'none'}\n\nSTDERR:\n${error.stderr || 'none'}`);
 
         // Try to parse JSON from playwright report directory even when command fails
         const jsonPath = join(pwAiAgentsDir, 'playwright-report', 'index.json');
@@ -256,7 +286,7 @@ export class ExecutorService {
         }
 
         // Clean up temp files
-        if (fs.existsSync(`${reportJsonFile}.log`)) fs.unlinkSync(`${reportJsonFile}.log`);
+        if (fs.existsSync(reportLogFile)) fs.unlinkSync(reportLogFile);
 
         logger.warn(`⚠️ Execution: Test completed with status: ${result.status}`);
       }

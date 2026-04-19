@@ -38,11 +38,24 @@ export const JiraIntegration = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch issue');
+        let errorMsg = `HTTP ${response.status}: Failed to fetch issue`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.error || errorData.message || errorMsg;
+        } catch {
+          // If response body is empty or invalid JSON, use the HTTP status message
+          const statusText = response.statusText || 'Unknown error';
+          errorMsg = `HTTP ${response.status}: ${statusText}`;
+        }
+        throw new Error(errorMsg);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        throw new Error('Invalid response from server: Unable to fetch jira details');
+      }
       console.log('📥 Fetch response:', data);
       
       // Extract issue data

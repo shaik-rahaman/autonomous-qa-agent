@@ -89,8 +89,20 @@ export class FileManager {
 
     logger.info('📝 Saving test script with validation...');
 
+    // ===== LOG STAGE 1: RAW CODE FROM LLM =====
+    logger.debug(`[STAGE 1 - RAW LLM CODE] Length: ${code.length} chars`);
+    logger.debug(`[STAGE 1 - RAW LLM CODE] First 200 chars: ${code.substring(0, 200)}`);
+    logger.debug(`[STAGE 1 - RAW LLM CODE] Last 100 chars: ${code.slice(-100)}`);
+
     // CRITICAL: Validate code before saving
     const validation = CodeValidator.validate(code);
+    
+    // ===== LOG STAGE 2: VALIDATION RESULT =====
+    logger.debug(`[STAGE 2 - VALIDATION] Valid: ${validation.valid}`);
+    if (!validation.valid) {
+      logger.debug(`[STAGE 2 - VALIDATION] Errors found:`);
+      validation.errors.forEach((err) => logger.debug(`  - ${err}`));
+    }
     
     if (!validation.valid) {
       logger.error('❌ Code validation failed before saving:', {
@@ -101,10 +113,12 @@ export class FileManager {
       logger.info('🔄 Using fallback Playwright test...');
       code = CodeValidator.generateFallbackTest(testSteps, url);
       logger.success('✓ Generated fallback test');
+      logger.debug(`[STAGE 2B - FALLBACK CODE] Length: ${code.length} chars`);
     } else if (validation.normalized) {
       // Use normalized version if available
       code = validation.normalized;
       logger.info('✓ Using normalized code');
+      logger.debug(`[STAGE 2B - NORMALIZED CODE] Length: ${code.length} chars`);
     }
 
     // Clean code: Remove markdown code fences if present
@@ -113,8 +127,15 @@ export class FileManager {
     cleanCode = cleanCode.replace(/^```(?:ts|tsx|typescript|javascript|js)?\n/, '');
     cleanCode = cleanCode.replace(/\n```$/, '');
 
+    // ===== LOG STAGE 3: AFTER MARKDOWN CLEANUP =====
+    logger.debug(`[STAGE 3 - MARKDOWN CLEANUP] Length: ${cleanCode.length} chars`);
+
     // Format code: Normalize quotes and syntax
     cleanCode = this.formatCode(cleanCode);
+    
+    // ===== LOG STAGE 4: AFTER FORMATTING =====
+    logger.debug(`[STAGE 4 - FORMATTING] Length: ${cleanCode.length} chars`);
+    logger.debug(`[STAGE 4 - FORMATTING] First 200 chars: ${cleanCode.substring(0, 200)}`);
     
     // Get base name without extension
     const baseName = fileName.replace(/\.spec\.ts$/, '');
@@ -147,6 +168,14 @@ export class FileManager {
 
     // FINAL VALIDATION: Ensure the file we're about to write is valid
     const finalValidation = CodeValidator.validate(cleanCode);
+    
+    // ===== LOG STAGE 5: FINAL VALIDATION =====
+    logger.debug(`[STAGE 5 - FINAL VALIDATION] Valid: ${finalValidation.valid}`);
+    if (!finalValidation.valid) {
+      logger.debug(`[STAGE 5 - FINAL VALIDATION] Errors:`);
+      finalValidation.errors.forEach((err) => logger.debug(`  - ${err}`));
+    }
+    
     if (!finalValidation.valid) {
       logger.error('❌ Final validation failed, cannot save:', {
         errors: finalValidation.errors,
@@ -154,8 +183,24 @@ export class FileManager {
       throw new Error(`Cannot save invalid Playwright test: ${finalValidation.errors.join('; ')}`);
     }
 
+    // ===== LOG STAGE 6: BEFORE FILE WRITE =====
+    logger.debug(`[STAGE 6 - BEFORE WRITE] File path: ${filePath}`);
+    logger.debug(`[STAGE 6 - BEFORE WRITE] Code length: ${cleanCode.length} chars`);
+    logger.debug(`[STAGE 6 - BEFORE WRITE] Code preview (first 100 chars):`);
+    logger.debug(`[STAGE 6 - BEFORE WRITE] ${cleanCode.substring(0, 100)}`);
+
     fs.writeFileSync(filePath, cleanCode, 'utf-8');
     logger.success(`Test script saved (overwritten if existed)`, actualFileName);
+
+    // ===== LOG STAGE 7: AFTER FILE WRITE - READ BACK FROM DISK =====
+    const savedCode = fs.readFileSync(filePath, 'utf-8');
+    logger.debug(`[STAGE 7 - AFTER WRITE] File read back from disk`);
+    logger.debug(`[STAGE 7 - AFTER WRITE] Length: ${savedCode.length} chars`);
+    logger.debug(`[STAGE 7 - AFTER WRITE] Content matches: ${savedCode === cleanCode ? 'YES' : 'NO'}`);
+    if (savedCode !== cleanCode) {
+      logger.warn(`[STAGE 7 - AFTER WRITE] Content mismatch detected!`);
+      logger.warn(`[STAGE 7 - AFTER WRITE] Expected length: ${cleanCode.length}, Actual: ${savedCode.length}`);
+    }
 
     // Return file metadata WITH the cleaned code that was actually saved
     const metadata: FileMetadata & { scriptPath: string; code: string } = {
@@ -187,6 +232,27 @@ export class FileManager {
           formatted = formatted.split('\n').filter((line) => !line.includes(keyword)).join('\n');
         }
       });
+
+      // STEP 1.5: CRITICAL FIX - Handle method chaining across lines BEFORE semicolon normalization
+      // Join lines that are method continuations (start with .)
+      // This fixes: await page.method()
+      //             .chainMethod()
+      const preLines = formatted.split('\n');
+      const preFJoinedLines: string[] = [];
+      let preIdx = 0;
+      while (preIdx < preLines.length) {
+        let current = preLines[preIdx];
+        
+        // If next line is a method chain (starts with .), join them
+        while (preIdx + 1 < preLines.length && preLines[preIdx + 1].trim().startsWith('.')) {
+          current = current.trimEnd() + preLines[preIdx + 1].trim();
+          preIdx++;
+        }
+        
+        preFJoinedLines.push(current);
+        preIdx++;
+      }
+      formatted = preFJoinedLines.join('\n');
 
       // STEP 2: Ensure proper line endings with semicolons (SIMPLIFIED & RELIABLE)
       const lines = formatted.split('\n');
@@ -224,7 +290,7 @@ export class FileManager {
         }
         
         // For method/function calls: ends with closing paren, needs semicolon
-        // This covers: await func(), page.method(), expect().toBeVisible()
+        // This covers: await func(), page.method(), expect().toBeVisible(), .click(), etc.
         if (trimmed.endsWith(')') && !trimmed.startsWith('if') && !trimmed.startsWith('while') && !trimmed.startsWith('for')) {
           return line + ';';
         }

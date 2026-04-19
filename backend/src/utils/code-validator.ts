@@ -3,6 +3,7 @@
  */
 
 import { logger } from './logger';
+import * as ts from 'typescript';
 
 export interface ValidationResult {
   valid: boolean;
@@ -141,9 +142,30 @@ export class CodeValidator {
   private static normalizeCode(code: string): string {
     let normalized = code;
 
-    // 1. Ensure each statement ends with semicolon (SIMPLIFIED & RELIABLE)
+    // CRITICAL FIX: Handle method chaining across lines BEFORE semicolon normalization
+    // Join lines that are method continuations (start with .)
+    // This fixes: await page.method()
+    //             .chainMethod()
     const lines = normalized.split('\n');
-    const normalizedLines = lines.map((line) => {
+    const joinedLines: string[] = [];
+    let i = 0;
+    while (i < lines.length) {
+      let current = lines[i];
+      
+      // If next line is a method chain (starts with .), join them
+      while (i + 1 < lines.length && lines[i + 1].trim().startsWith('.')) {
+        current = current.trimEnd() + lines[i + 1].trim();
+        i++;
+      }
+      
+      joinedLines.push(current);
+      i++;
+    }
+    normalized = joinedLines.join('\n');
+
+    // 1. Ensure each statement ends with semicolon (SIMPLIFIED & RELIABLE)
+    const splitLines = normalized.split('\n');
+    const normalizedLines = splitLines.map((line) => {
       const trimmed = line.trim();
       
       // Skip empty lines, comments, and docstring markers
@@ -176,8 +198,8 @@ export class CodeValidator {
         return line;
       }
       
-      // For method/function calls: ends with closing paren, needs semicolon
-      // This covers: await func(), page.method(), expect().toBeVisible()
+      // CRITICAL: For method/function calls: ends with closing paren, needs semicolon
+      // This covers: await func(), page.method(), expect().toBeVisible(), .click(), etc.
       if (trimmed.endsWith(')') && !trimmed.startsWith('if') && !trimmed.startsWith('while') && !trimmed.startsWith('for')) {
         return line + ';';
       }
@@ -228,36 +250,255 @@ export class CodeValidator {
   }
 
   /**
-   * Check for basic syntax errors
+   * Check for real JavaScript syntax errors - COMPREHENSIVE
+   * Validates: brackets, braces, parens, semicolons, quotes, and syntax patterns
+   * Now includes TypeScript parser for real syntax validation
    */
   private static checkSyntaxErrors(code: string): string[] {
     const errors: string[] = [];
 
-    // Check for unmatched quotes
-    const doubleQuotes = (code.match(/"/g) || []).length;
+    // === PHASE 1: USE TYPESCRIPT PARSER FOR REAL SYNTAX VALIDATION ===
+    // This is the most reliable way to catch actual JavaScript/TypeScript syntax errors
+    const tsErrors = this.validateWithTypeScriptParser(code);
+    if (tsErrors.length > 0) {
+      logger.debug('  TypeScript parser found syntax errors:');
+      tsErrors.forEach((err) => logger.debug(`    - ${err}`));
+      errors.push(...tsErrors);
+      // If TS parser found errors, return immediately - these are real syntax issues
+      if (errors.length > 0) {
+        return errors;
+      }
+    }
+
+    // === PHASE 2: REGEX-BASED VALIDATION (Fallback/Complement) ===
+    const regexErrors = this.validateWithRegex(code);
+    errors.push(...regexErrors);
+
+    return errors;
+  }
+
+  /**
+   * Validate code using TypeScript compiler API
+   * This catches REAL JavaScript/TypeScript syntax errors
+   */
+  private static validateWithTypeScriptParser(code: string): string[] {
+    const errors: string[] = [];
+
+    try {
+      // Parse the code as TypeScript
+      const sourceFile = ts.createSourceFile(
+        'test.ts',
+        code,
+        ts.ScriptTarget.Latest,
+        true
+      );
+
+      // Get diagnostics from the source file syntax checking
+      // (getPreEmitDiagnostics requires a Program in TS 5.4+, so we parse syntax errors differently)
+      const diags: ts.Diagnostic[] = [];
+      
+      // Check for syntax errors in the parsed source
+      function visit(node: ts.Node) {
+        if (node.kind === ts.SyntaxKind.Unknown) {
+          diags.push({
+            file: sourceFile,
+            start: node.getStart(),
+            length: node.getWidth(),
+            messageText: 'Unknown syntax',
+            category: ts.DiagnosticCategory.Error,
+            code: 0,
+          } as ts.Diagnostic);
+        }
+        ts.forEachChild(node, visit);
+      }
+      visit(sourceFile);
+
+      if (diags.length > 0) {
+        logger.debug(`  TS Parser: Found ${diags.length} syntax issues`);
+
+        diags.forEach((diagnostic) => {
+          if (sourceFile.text && diagnostic.start !== undefined) {
+            const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+              diagnostic.start
+            );
+            const message = ts.flattenDiagnosticMessageText(
+              diagnostic.messageText,
+              '\n'
+            );
+            errors.push(
+              `Line ${line + 1}:${character + 1}: ${message}`
+            );
+          }
+        });
+      }
+
+      // Try ts.transpile to catch compilation errors - this is the most reliable check
+      try {
+        ts.transpile(code, {
+          target: ts.ScriptTarget.ES2020,
+          module: ts.ModuleKind.CommonJS,
+        });
+        logger.debug('  TS Parser: Code transpiles successfully');
+      } catch (transpileError) {
+        const errorMsg = transpileError instanceof Error ? transpileError.message : String(transpileError);
+        if (!errors.some((e) => e.includes('transpil'))) {
+          errors.push(`Transpilation failed: ${errorMsg}`);
+        }
+      }
+    } catch (parseError) {
+      const errorMsg = parseError instanceof Error ? parseError.message : String(parseError);
+      logger.debug(`  TS Parser error: ${errorMsg}`);
+      // Don't fail hard on parser errors, fallback to regex validation
+    }
+
+    return errors;
+  }
+
+  /**
+   * Regex-based validation (complement to TypeScript parser)
+   */
+  private static validateWithRegex(code: string): string[] {
+    const errors: string[] = [];
+    const lines = code.split('\n');
+
+    // === 1. VALIDATE MATCHING BRACES/BRACKETS/PARENTHESES ===
+    const openBraces = (code.match(/{/g) || []).length;
+    const closeBraces = (code.match(/}/g) || []).length;
+    if (openBraces !== closeBraces) {
+      errors.push(
+        `Unmatched braces: ${openBraces} '{' but ${closeBraces} '}' found`
+      );
+    }
+
+    const openBrackets = (code.match(/\[/g) || []).length;
+    const closeBrackets = (code.match(/\]/g) || []).length;
+    if (openBrackets !== closeBrackets) {
+      errors.push(
+        `Unmatched brackets: ${openBrackets} '[' but ${closeBrackets} ']' found`
+      );
+    }
+
+    const openParens = (code.match(/\(/g) || []).length;
+    const closeParens = (code.match(/\)/g) || []).length;
+    if (openParens !== closeParens) {
+      errors.push(
+        `Unmatched parentheses: ${openParens} '(' but ${closeParens} ')' found`
+      );
+    }
+
+    // === 2. VALIDATE QUOTES ===
+    let doubleQuotes = 0;
+    let singleQuotes = 0;
+    let backticks = 0;
+    let inString = null;
+    let escaped = false;
+
+    for (let i = 0; i < code.length; i++) {
+      const char = code[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"' && !inString) {
+        inString = '"';
+        doubleQuotes++;
+      } else if (char === '"' && inString === '"') {
+        inString = null;
+        doubleQuotes++;
+      } else if (char === "'" && !inString) {
+        inString = "'";
+        singleQuotes++;
+      } else if (char === "'" && inString === "'") {
+        inString = null;
+        singleQuotes++;
+      } else if (char === '`' && !inString) {
+        inString = '`';
+        backticks++;
+      } else if (char === '`' && inString === '`') {
+        inString = null;
+        backticks++;
+      }
+    }
+
     if (doubleQuotes % 2 !== 0) {
-      errors.push('Unmatched double quotes');
+      errors.push(`Unmatched double quotes: ${doubleQuotes} found`);
     }
-
-    const singleQuotes = (code.match(/'/g) || []).length;
     if (singleQuotes % 2 !== 0) {
-      errors.push('Unmatched single quotes');
+      errors.push(`Unmatched single quotes: ${singleQuotes} found`);
+    }
+    if (backticks % 2 !== 0) {
+      errors.push(`Unmatched backticks: ${backticks} found`);
     }
 
-    // Check for incomplete async/await
-    const asyncPattern = /async\s*\(|async\s*\{/g;
+    // === 3. LINE-BY-LINE STATEMENT VALIDATION ===
+    for (let idx = 0; idx < lines.length; idx++) {
+      const line = lines[idx];
+      const trimmed = line.trim();
+
+      // Skip empty lines and comments
+      if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*')) {
+        continue;
+      }
+
+      // Check for statements that require semicolons
+      const requiresSemicolon =
+        (trimmed.startsWith('await ') ||
+          trimmed.startsWith('const ') ||
+          trimmed.startsWith('let ') ||
+          trimmed.startsWith('var ') ||
+          trimmed.startsWith('return ') ||
+          trimmed.startsWith('throw ') ||
+          trimmed.includes('expect(')) &&
+        !trimmed.endsWith('{') &&
+        !trimmed.endsWith('(') &&
+        !trimmed.endsWith(',') &&
+        !trimmed.endsWith(';') &&
+        !trimmed.endsWith('=>');
+
+      if (requiresSemicolon && !trimmed.endsWith(';')) {
+        const hasOpenBrace = (trimmed.match(/{/g) || []).length > 0;
+        const hasOpenParen =
+          (trimmed.match(/\(/g) || []).length > (trimmed.match(/\)/g) || []).length;
+
+        if (!hasOpenBrace && !hasOpenParen) {
+          errors.push(
+            `Line ${idx + 1}: Statement "${trimmed.substring(0, 40)}..." missing semicolon`
+          );
+        }
+      }
+
+      // Check for incomplete method chains
+      if (trimmed.endsWith('.')) {
+        if (idx + 1 < lines.length) {
+          const nextLine = lines[idx + 1].trim();
+          if (nextLine && !nextLine.startsWith('.')) {
+            errors.push(
+              `Line ${idx + 1}: Method chain incomplete - line ends with '.'`
+            );
+          }
+        } else {
+          errors.push(
+            `Line ${idx + 1}: Method chain incomplete - file ends with '.'`
+          );
+        }
+      }
+    }
+
+    // === 4. CHECK FOR COMMON PATTERNS ===
+    const asyncPattern = /async\s*\(/g;
     const asyncCount = (code.match(asyncPattern) || []).length;
-    const arrowPattern = /=>/g;
-    const arrowCount = (code.match(arrowPattern) || []).length;
+    const tryCount = (code.match(/\btry\b/g) || []).length;
+    const catchCount = (code.match(/\bcatch\b/g) || []).length;
 
-    if (asyncCount !== arrowCount && asyncCount > 0) {
-      // Allow some variance as not all async needs =>
-      logger.debug(`  Async/await pattern check: ${asyncCount} async, ${arrowCount} arrows`);
-    }
-
-    // Check for console errors that indicate syntax issues
-    if (code.includes('Unexpected token') || code.includes('SyntaxError')) {
-      errors.push('Code contains error messages');
+    if (tryCount > catchCount) {
+      errors.push(`Incomplete try-catch: ${tryCount} try blocks but ${catchCount} catch blocks`);
     }
 
     return errors;

@@ -1,7 +1,7 @@
-Feature: User Login
-  Scenario: Successful login
-    Given the user is on the login page
-    When the user enters username "demosalesmanager"
-    And the user enters password "crmsfa"
-    And clicks the login button
+Feature: CRM Login
+  Scenario: Successful login to CRM
+    Given the user opens the login page
+    When the user enters the username "demosalesmanager"
+    And the user enters the password "crmsfa"
+    And the user clicks the login button
     Then the CRM link should appear

@@ -30,7 +30,7 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
 
-    headless: false,
+    headless: process.env.HEADLESS === 'true' ? true : false,
 
     /* Collect trace on first retry; open with: npx playwright show-trace */
     trace: 'on',

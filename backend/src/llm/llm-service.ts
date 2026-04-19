@@ -82,6 +82,14 @@ For buttons: button:has-text("Login"), [role="button"], getByRole("button", { na
 For links: a:has-text("CRM"), [role="link"], getByRole("link", { name: /crm/i })
 For text: page.getByText(/exact text/i)
 
+!!!CRITICAL - NO METHOD CHAINING ACROSS LINES!!!
+DO NOT split method chains across multiple lines.
+WRONG:
+  await page.getByRole("button", { name: /login/i })
+    .click();
+CORRECT:
+  await page.getByRole("button", { name: /login/i }).click();
+
 !!!FINAL CHECKLIST BEFORE OUTPUT!!!
 Before generating code, verify EACH of these:
 ✓ Import statement has "@playwright/test"
