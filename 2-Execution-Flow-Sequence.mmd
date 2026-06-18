@@ -1,0 +1,91 @@
+sequenceDiagram
+    actor User
+    participant UI as React Frontend
+    participant API as Express API
+    participant GenAgent as 🔄 Generation Agent
+    participant LangChain as 🤖 LangChain Orchestrator
+    participant Executor as ⚙️ Test Executor
+    participant Browser as 🌐 Playwright Browser
+    participant SelfHeal as 🏥 Self-Healing Agent
+    participant Storage as 💾 Storage
+
+    User->>UI: 1. Fetch Jira Issue
+    UI->>API: GET /jira/issues/GEN-27
+    API-->>UI: Issue data + Description
+
+    User->>UI: 2. Generate Test
+    UI->>API: POST /generate-test
+    activate GenAgent
+    GenAgent->>GenAgent: English → Gherkin
+    GenAgent->>GenAgent: Gherkin → Playwright Code
+    GenAgent->>GenAgent: Validate TypeScript
+    GenAgent-->>API: Generated test file
+    deactivate GenAgent
+
+    activate Storage
+    Storage->>Storage: Save test code
+    Storage-->>API: File saved
+    deactivate Storage
+
+    API-->>UI: Test code + File path
+
+    User->>UI: 3. Execute Test
+    UI->>API: POST /execute
+    
+    activate LangChain
+    LangChain->>LangChain: Decision: Run test?
+    LangChain->>LangChain: Check selector cache
+    LangChain-->>Executor: Tool: run_test()
+
+    activate Executor
+    Executor->>Browser: npx playwright test
+    Browser->>Browser: Launch browser
+    Browser->>Browser: Navigate page
+    Browser->>Browser: Fill credentials
+    Browser->>Browser: Click login button
+    Browser->>Browser: Assert CRM link visible
+    alt Test PASSES ✅
+        Browser-->>Executor: Exit code 0
+        Executor-->>LangChain: {status: passed}
+    else Test FAILS ❌
+        Browser-->>Executor: Test failed - Selector not found
+        Executor-->>LangChain: {status: failed, error}
+        
+        deactivate Executor
+        
+        LangChain->>LangChain: Decision: Heal test?
+        LangChain-->>SelfHeal: Tool: heal_test()
+        
+        activate SelfHeal
+        SelfHeal->>SelfHeal: 1️⃣ Detector: Parse error
+        SelfHeal->>SelfHeal: 2️⃣ Analyzer: Root cause
+        SelfHeal->>SelfHeal: 3️⃣ MCP: Query DOM
+        SelfHeal->>SelfHeal: 4️⃣ Recommender: Find alternative
+        SelfHeal->>SelfHeal: AI suggests: getByRole('link')
+        SelfHeal-->>LangChain: {fixed: true, newSelector}
+        
+        activate Storage
+        Storage->>Storage: Cache healed selector
+        deactivate Storage
+        
+        deactivate SelfHeal
+        
+        LangChain->>Executor: Tool: run_test(withHeal)
+        activate Executor
+        Executor->>Browser: Retry with new selector
+        Browser-->>Executor: Exit code 0 ✅
+        deactivate Executor
+    end
+
+    Executor-->>LangChain: Final result
+    deactivate LangChain
+
+    LangChain-->>API: {status, passed, failed, healed}
+    activate Storage
+    Storage->>Storage: Save execution result
+    deactivate Storage
+    
+    API-->>UI: Execution result
+    UI->>UI: Display results
+    User->>UI: View report
+    UI-->>User: HTML Report 📊

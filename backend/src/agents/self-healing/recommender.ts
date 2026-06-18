@@ -1,328 +1,384 @@
-/**
- * Fix Recommender - Intelligent LLM-based Failure Analysis
- * Analyzes ANY Playwright test failure type and generates intelligent fixes
- */
-
 import Groq from 'groq-sdk';
-import { logger } from '../../utils/logger';
+import * as path from 'path';
+import * as fs from 'fs';
+import { ErrorClassifier } from './error-classifier';
+import {
+  extractFailedLocator,
+  extractStrictModeCandidates,
+  pickBestCandidate,
+  isValidSelector,
+} from './error-parser';
 
-// Lazy import of MCPClient - only when needed to avoid circular dependencies
-let mcpClientInstance: any = null;
+// Validate all healing dependencies are present and fail fast if not
+export async function validateHealingDependencies() {
+  console.log(`\n[BLOCKER-CHECK] Validating healing dependencies...`);
 
-async function getMCPClient() {
-  if (!mcpClientInstance) {
-    try {
-      // Dynamic import to avoid circular dependencies at startup
-      // @ts-ignore - Dynamic import resolution
-      const { MCPClient } = await import('../../mcp/client');
-      mcpClientInstance = new MCPClient(process.env.MCP_SERVER_URL);
-    } catch (error) {
-      console.error('Failed to load MCP client:', error);
-      throw new Error('MCP client initialization failed');
-    }
+  if (!process.env.GROQ_API_KEY) {
+    console.warn(`⚠️ GROQ_API_KEY is not set - LLM-based healing will be skipped`);
+  } else {
+    console.log(`✓ GROQ_API_KEY loaded`);
   }
-  return mcpClientInstance;
+
+  if (!process.env.MCP_SERVER_URL) {
+    console.warn(`⚠️ MCP_SERVER_URL is not set - MCP-based healing will be skipped`);
+  } else {
+    console.log(`✓ MCP_SERVER_URL: ${process.env.MCP_SERVER_URL}`);
+  }
+
+  // Do not fail startup if MCP client is unavailable - heuristics should still work
+  try {
+    const mod = await import('../../mcp/client').catch(() => null);
+    if (mod && (mod.MCPClient || mod.mcpClient)) {
+      console.log('✓ MCP module import succeeded');
+    } else {
+      console.warn('⚠️ MCP module not available at startup - will attempt lazy load when needed');
+    }
+  } catch (e) {
+    console.warn(`⚠️ MCP client import check failed: ${String(e)}`);
+  }
 }
 
-const groqClient = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+// Lazy-load MCP client to avoid brittle relative require paths in compiled output
+let _mcpClient: any = null;
+async function getMCPClient(): Promise<any> {
+  if (_mcpClient) return _mcpClient;
+  const candidates = [
+    '../../mcp/client',
+    '../mcp/client',
+    path.resolve(process.cwd(), 'backend', 'src', 'mcp', 'client'),
+    path.resolve(process.cwd(), 'pw-ai-agents', 'src', 'mcp', 'client'),
+    path.resolve(process.cwd(), 'backend', 'dist', 'mcp', 'client'),
+  ];
+  for (const p of candidates) {
+    try {
+      const mod = await import(p);
+      if (mod.mcpClient) { _mcpClient = mod.mcpClient; return _mcpClient; }
+      if (mod.MCPClient) { _mcpClient = new mod.MCPClient(process.env.MCP_SERVER_URL); return _mcpClient; }
+    } catch (err) {
+      try {
+        // Try require as fallback
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const req = require(p);
+        if (req.mcpClient) { _mcpClient = req.mcpClient; return _mcpClient; }
+        if (req.MCPClient) { _mcpClient = new req.MCPClient(process.env.MCP_SERVER_URL); return _mcpClient; }
+      } catch (e) {
+        // continue
+      }
+    }
+  }
+  // Return null if MCP cannot be loaded - callers should fallback to heuristics
+  return null;
+}
+
+// Lazily instantiate Groq client only when needed. If GROQ_API_KEY is not set, LLM calls will be skipped.
+let groqClient: any = null;
+function getGroqClient() {
+  if (groqClient) return groqClient;
+  if (!process.env.GROQ_API_KEY) return null;
+  groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  return groqClient;
+}
 
 export interface FailureAnalysis {
   type: 'locator_issue' | 'timeout_issue' | 'navigation_issue' | 'unknown';
   fixable: boolean;
-  fix?: {
-    selector?: string;
-    action?: 'click' | 'fill' | 'wait' | 'navigate';
-    strategy?: string;
-  };
+  fix?: { selector?: string; action?: 'click' | 'fill' | 'wait' | 'navigate'; strategy?: string };
 }
 
-export interface LocatorFix {
-  fixed: boolean;
-  newSelector?: string;
-  action?: string;
-  reason: string;
+export interface LocatorFix { fixed: boolean; newSelector?: string; action?: string; reason: string }
+
+export interface HealingDiagnostics {
+  timestamp: string;
+  playgroundError: string;
+  extractedLocator: string | null;
+  failureType: string;
+  healingCandidates: Array<{ selector: string; score: number }>;
+  selectedCandidate: string | null;
+  injectionSuccess: boolean;
+  injectionDetails: string;
+  retryStatus: 'pending' | 'passed' | 'failed';
+  retryError?: string;
 }
 
+const logger = {
+  info: (..._args: any[]) => {},
+  warn: (..._args: any[]) => {},
+  error: (..._args: any[]) => {},
+  debug: (..._args: any[]) => {},
+  success: (..._args: any[]) => {},
+  section: (..._args: any[]) => {},
+};
 
 export class FixRecommender {
+  private diagnostics: HealingDiagnostics = {
+    timestamp: new Date().toISOString(),
+    playgroundError: '',
+    extractedLocator: null,
+    failureType: 'unknown',
+    healingCandidates: [],
+    selectedCandidate: null,
+    injectionSuccess: false,
+    injectionDetails: '',
+    retryStatus: 'pending',
+  };
+
+  getDiagnostics(): HealingDiagnostics { return { ...this.diagnostics } }
+  private updateDiagnostics(field: keyof HealingDiagnostics, value: any) { (this.diagnostics as any)[field] = value }
+
   /**
-   * Main entry point - ALWAYS attempt healing for ANY Playwright UI failure
-   * NO blocking conditions - healing is FORCED for all errors
+   * Main entry - try MCP+LLM then heuristics. Normalizes error inputs.
    */
-  async suggestAlternativeSelector(error: string, originalSelector: string, url?: string, step?: string): Promise<LocatorFix> {
-    try {
-      logger.info(`\n========== HEALING STARTED ==========`);
-      logger.info(`🏥 Healing attempt for: ${step || 'unknown'}`);
-      
-      // STEP 1: Extract FULL selector pattern from error (CRITICAL)
-      logger.info(`[STEP 1] Extracting FULL selector from error message...`);
-      let extractedSelector = originalSelector;
+  async suggestAlternativeSelector(error: any, originalSelector?: string, url?: string, step?: string): Promise<LocatorFix> {
+    await validateHealingDependencies();
+
+    const message = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
+    this.updateDiagnostics('playgroundError', message);
+    this.updateDiagnostics('timestamp', new Date().toISOString());
+
+    console.log(`\n[RECOMMENDER] HEALING PIPELINE START`);
+    console.log(`[RECOMMENDER] Playwright Error: ${String(message).substring(0, 300)}`);
+    console.log(`[RECOMMENDER] Original Selector: ${originalSelector || 'none'}`);
+
+    // Prefer deep extraction from original error object (to get Symbol props)
+    let extractedLocator = extractFailedLocator(error, error) || extractFailedLocator(message) || originalSelector || null;
+    console.log(`[RECOMMENDER] FAILED SELECTOR: ${extractedLocator}`);
+    this.updateDiagnostics('extractedLocator', extractedLocator);
+
+    if (extractedLocator && !isValidSelector(extractedLocator)) {
+      // Fail-fast if selector exists but invalid
+      console.error(`[RECOMMENDER] ❌ Invalid selector extracted: ${extractedLocator}`);
+      this.updateDiagnostics('injectionSuccess', false);
+      this.updateDiagnostics('injectionDetails', `Invalid selector: ${extractedLocator}`);
+      return { fixed: false, reason: `Invalid selector extracted: ${extractedLocator}` };
+    }
+
+    // Classify
+    const classification = ErrorClassifier.classify(message, extractedLocator || undefined);
+    this.updateDiagnostics('failureType', classification.type);
+    console.log(`[RECOMMENDER] Classification: ${classification.type}; Healable: ${classification.isHealable}`);
+    if (!classification.isHealable) {
+      return { fixed: false, reason: `Error type not healable: ${classification.type}` };
+    }
+
+    // Strict-mode candidates
+    const strictCandidates = extractStrictModeCandidates(message || '');
+    if (strictCandidates && strictCandidates.length > 0) {
+      this.updateDiagnostics('healingCandidates', strictCandidates.map(c => ({ selector: c.selector, score: c.score })));
+      console.log(`[RECOMMENDER] HEALING CANDIDATES: ${strictCandidates.map(c => c.selector).join(', ')}`);
+      const best = pickBestCandidate(strictCandidates);
+      if (best && isValidSelector(best.selector)) {
+        console.log(`[RECOMMENDER] SELECTED: ${best.selector}`);
+        this.updateDiagnostics('selectedCandidate', best.selector);
+        this.updateDiagnostics('injectionSuccess', true);
+        this.updateDiagnostics('injectionDetails', `Strict mode candidate selected (score: ${best.score})`);
+        return { fixed: true, newSelector: best.selector, action: 'strict_mode_resolution', reason: `Strict mode candidate (score: ${best.score})` };
+      }
+    }
+
+    // Try MCP+LLM if URL available and MCP client can be loaded
+    if (url) {
       try {
-        // Try to extract full getByRole(...) pattern
-        const fullMatch = error?.match(/getByRole\([^)]*\)/);
-        if (fullMatch && fullMatch[0]) {
-          extractedSelector = fullMatch[0];
-          logger.info(`   ✓ Extracted full selector: ${extractedSelector}`);
-        } else {
-          logger.info(`   ⚠ Full pattern not found, using original: ${extractedSelector}`);
+        console.log('🧠 Attempting MCP+LLM selector discovery...');
+        let mcp: any = null;
+        try {
+          mcp = await getMCPClient();
+        } catch (mcpErr) {
+          console.warn('⚠️ MCP unavailable (import failed):', mcpErr);
+          mcp = null;
+        }
+        if (!mcp) {
+          console.warn('⚠️ MCP client not available; skipping MCP+LLM and falling back to heuristics');
+          throw new Error('MCP unavailable');
+        }
+        const llmFix = await this.suggestViaLLMWithDOM(message, extractedLocator || originalSelector, url, step || 'unknown');
+        if (llmFix && llmFix.fixed) {
+          console.log(`[RECOMMENDER] SELECTED (LLM): ${llmFix.newSelector}`);
+          this.updateDiagnostics('selectedCandidate', llmFix.newSelector || null);
+          this.updateDiagnostics('injectionSuccess', true);
+          // Debug prints requested
+          console.log('FAILED:');
+          console.log(extractedLocator);
+          console.log('CANDIDATES:');
+          console.log(this.diagnostics.healingCandidates.map(c => c.selector).join('\n'));
+          console.log('SELECTED:');
+          console.log(llmFix.newSelector);
+          console.log('CONFIDENCE:');
+          console.log('LLM');
+          return llmFix;
         }
       } catch (e) {
-        logger.debug('Could not extract selector from error', e);
+        console.warn('⚠️ LLM+MCP approach failed or skipped, falling back to heuristics:', e);
       }
-
-      // STEP 2: Fetch DOM context via MCP (FORCED)
-      logger.info(`[STEP 2] Fetching DOM context via MCP...`);
-      let domContext = '';
-      if (url) {
-        try {
-          domContext = await this.getDOMContext(url);
-          logger.info(`   ✓ DOM fetched for healing`);
-        } catch (err) {
-          logger.warn(`   ⚠ DOM fetch failed, continuing without DOM: ${err}`);
-          // NO RETURN - continue anyway
-        }
-      }
-
-      // STEP 3: Call LLM for failure analysis (FORCED)
-      logger.info(`[STEP 3] Calling LLM for healing analysis...`);
-      const analysis = await this.analyzeFailure({
-        step: step || 'unknown_step',
-        error,
-        selector: extractedSelector,
-        url: url || 'unknown',
-        domContext,
-      });
-
-      logger.info(`   ✓ LLM analysis complete`);
-      logger.info(`   - Type: ${analysis.type}`);
-      logger.info(`   - Fixable: ${analysis.fixable}`);
-
-      // STEP 4: Process LLM response
-      logger.info(`[STEP 4] Processing LLM response...`);
-      
-      if (!analysis.fixable) {
-        logger.warn(`   ⚠ LLM says not fixable`);
-        return {
-          fixed: false,
-          reason: `LLM analysis: ${analysis.type} - Not fixable`,
-        };
-      }
-
-      // Extract new selector from LLM response
-      if (analysis.fix?.selector) {
-        logger.success(`✅ HEALING SUCCESS`);
-        logger.info(`   New selector: ${analysis.fix.selector}`);
-        logger.info(`   Action: ${analysis.fix.action || 'none'}`);
-        return {
-          fixed: true,
-          newSelector: analysis.fix.selector,
-          action: analysis.fix.action,
-          reason: `LLM-generated fix for ${analysis.type}`,
-        };
-      }
-
-      if (analysis.fix?.strategy) {
-        logger.success(`✅ HEALING SUCCESS`);
-        logger.info(`   Strategy: ${analysis.fix.strategy}`);
-        return {
-          fixed: true,
-          action: analysis.fix.action,
-          reason: `LLM-generated strategy: ${analysis.fix.strategy}`,
-        };
-      }
-
-      logger.warn(`   ⚠ LLM had no fix to generate`);
-      return {
-        fixed: false,
-        reason: 'LLM could not generate fix',
-      };
-    } catch (error) {
-      logger.error(`❌ HEALING FAILED`);
-      logger.error(`   Error: ${error}`);
-      return {
-        fixed: false,
-        reason: `Healing error: ${String(error)}`,
-      };
     }
+
+    // Fallback heuristics
+    console.log('📋 Using heuristic-based selector generation...');
+    const alt = this.generateAlternativeHeuristic(message, extractedLocator || originalSelector || undefined);
+    if (alt) {
+      console.log(`[RECOMMENDER] HEALING CANDIDATES: ${alt}`);
+      console.log(`[RECOMMENDER] SELECTED: ${alt}`);
+      this.updateDiagnostics('selectedCandidate', alt);
+      this.updateDiagnostics('injectionSuccess', true);
+      this.updateDiagnostics('injectionDetails', `Heuristic-generated selector`);
+      // Debug prints requested
+      console.log('FAILED:');
+      console.log(extractedLocator);
+      console.log('CANDIDATES:');
+      console.log(alt);
+      console.log('SELECTED:');
+      console.log(alt);
+      console.log('CONFIDENCE:');
+      console.log('heuristic');
+      return { fixed: true, newSelector: alt, reason: `Generated heuristic-based selector: ${alt}` };
+    }
+
+    return { fixed: false, reason: 'Could not generate alternative selector' };
   }
 
-  /**
-   * Fetch DOM context using MCP (FORCED)
-   */
-  private async getDOMContext(url: string): Promise<string> {
-    logger.info(`   📡 Initializing MCP connection...`);
+  /** Use MCP + LLM to analyze DOM and propose selector */
+  private async suggestViaLLMWithDOM(error: string, originalSelector: string | undefined, url: string, step: string): Promise<LocatorFix> {
     try {
-      const mcpClient = await getMCPClient();
-      logger.info(`   ✓ MCP client ready`);
-      logger.info(`   📄 Opening URL: ${url}`);
-
-      // Try to open the URL in MCP's browser before fetching DOM (use executeTool when available)
+      const mcp = await getMCPClient();
       try {
-        if (typeof mcpClient.executeTool === 'function') {
-          await mcpClient.executeTool('open_url', { url });
-        } else if (typeof mcpClient.openUrl === 'function') {
-          await mcpClient.openUrl(url);
-        }
-        logger.info(`   ✓ URL opened in MCP browser`);
+        if (typeof mcp.executeTool === 'function') await mcp.executeTool('open_url', { url });
+        else if (typeof mcp.openUrl === 'function') await mcp.openUrl(url);
       } catch (openErr) {
-        logger.warn('   ⚠ MCP open_url failed (continuing):', openErr);
+        console.warn('⚠ MCP open_url failed (continuing):', openErr);
       }
 
-      logger.info(`   🌐 Fetching DOM structure...`);
       let domResponse: any;
-      if (typeof mcpClient.executeTool === 'function') {
-        domResponse = await mcpClient.executeTool('get_dom_json', { url });
-      } else {
-        domResponse = await mcpClient.getDomJson(url);
-      }
+      if (typeof mcp.executeTool === 'function') domResponse = await mcp.executeTool('get_dom_json', { url });
+      else domResponse = await mcp.getDomJson(url);
 
-      if (!domResponse?.elements?.length) {
-        logger.warn(`   ⚠ No DOM elements returned`);
-        return 'No DOM elements available';
-      }
+      if (!domResponse?.elements?.length) throw new Error('Empty DOM response from MCP');
 
-      logger.info(`   ✓ DOM fetched: ${domResponse.elements.length} elements found`);
-      return this.formatDOMForLLM(domResponse.elements);
+      const domContext = this.formatDOMForLLM(domResponse.elements);
+      const suggestion = await this.queryLLMForSelector(error, originalSelector || '', step, domContext, domResponse.title || 'Unknown');
+      if (suggestion && isValidSelector(suggestion)) {
+        return { fixed: true, newSelector: suggestion, reason: 'LLM-recommended selector' };
+      }
+      return { fixed: false, reason: 'LLM did not return a valid selector' };
     } catch (err) {
-      logger.warn(`   ⚠ MCP DOM fetch error: ${err}`);
+      console.error('LLM+MCP failed:', err);
       throw err;
     }
   }
 
-  /**
-   * LLM-based failure analysis - ALWAYS treat locator issues as fixable
-   * NO blocking - LLM decides type, but locator issues are ALWAYS fixable
-   */
-  private async analyzeFailure(input: {
-    step: string;
-    error: string;
-    selector?: string;
-    url: string;
-    domContext?: string;
-  }): Promise<FailureAnalysis> {
-    const systemPrompt = `You are a QA healing expert for Playwright tests. Your ONLY job is to fix element locator issues.
-
-CRITICAL RULES:
-1. If error contains ANY of: "not found", "not visible", "element(s) not found", "toBeVisible", "locator", "Locator", "getByRole"
-   → Type is locator_issue, ALWAYS return fixable: TRUE
-   
-2. For locator_issue AND fixable: TRUE, MUST return:
-   {
-     "type": "locator_issue",
-     "fixable": true,
-     "fix": {
-       "selector": "getByRole('button', { name: /..../i })",
-       "action": "click"
-     }
-   }
-
-3. For non-locator failures, only then can you return fixable: false
-
-4. ANALYZE the error to find the intended element and suggest a BETTER selector using the DOM
-
-5. Return ONLY valid JSON, nothing else.
-
-Format examples:
-FIXABLE:
-{"type":"locator_issue","fixable":true,"fix":{"selector":"getByRole('button', { name: /login/i })","action":"click"}}
-
-NOT FIXABLE (only for non-locator):
-{"type":"timeout_issue","fixable":false}`;
-
-    const userMessage = `HEALING REQUEST:
-
-Step: ${input.step}
-URL: ${input.url}
-Original Selector: ${input.selector || 'none'}
-
-ERROR:
-${input.error}
-
-${input.domContext ? `AVAILABLE DOM:\n${input.domContext}` : ''}
-
-TASK: Fix this by generating a working selector or strategy. For locator_issue, ALWAYS return fixable: true.`;
-
+  private async queryLLMForSelector(errorMessage: string, failedSelector: string, stepDescription: string, domElements: string, pageTitle?: string): Promise<string | null> {
+    const systemPrompt = `You are an expert QA automation engineer specializing in element locator strategies. Return ONLY a single selector string.`;
+    const userMessage = `FAILED SELECTOR ANALYSIS:\nTest Step: ${stepDescription}\nPage Title: ${pageTitle}\nOriginal Failed Selector: ${failedSelector}\nError Message: ${errorMessage}\n\nAVAILABLE DOM ELEMENTS:\n${domElements}\n`;
     try {
-      logger.info(`🤖 [LLM] Querying for failure analysis...`);
-      
-      const response = await groqClient.chat.completions.create({
+      const client = getGroqClient();
+      if (!client) throw new Error('GROQ_API_KEY not configured — LLM disabled');
+      const response = await client.chat.completions.create({
         model: process.env.LLM_MODEL || 'mixtral-8x7b-32768',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-        temperature: 0.1, // Very low temp for strict adherence
-        max_tokens: 300,
+        messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: userMessage } ],
+        temperature: 0.2,
+        max_tokens: 150,
       });
-
-      const responseText = (response.choices[0].message.content || '').trim();
-      logger.info(`[LLM Response] ${responseText.substring(0, 200)}...`);
-
-      // Parse LLM response as JSON
-      const analysis = this.parseLLMAnalysis(responseText);
-      logger.info(`✓ [Parsed] Type: ${analysis.type}, Fixable: ${analysis.fixable}`);
-      
-      return analysis;
-    } catch (error) {
-      logger.error(`❌ [LLM] Analysis error: ${error}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Parse LLM JSON response safely
-   */
-  private parseLLMAnalysis(responseText: string): FailureAnalysis {
-    try {
-      // Try direct parse
-      const analysis = JSON.parse(responseText);
-      
-      if (!analysis.type) analysis.type = 'unknown';
-      if (analysis.fixable === undefined) analysis.fixable = false;
-      
-      return analysis;
+      const suggestionText = (response.choices[0].message.content || '').trim();
+      const cleaned = suggestionText.replace(/```[\w]*\n?/g, '').replace(/\n/g, '').trim();
+      if (cleaned && cleaned !== 'null') return cleaned;
+      return null;
     } catch (err) {
-      logger.warn(`⚠️ Failed to parse LLM response as JSON: ${err}`);
-      
-      // Fallback: try to extract JSON from text
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          return JSON.parse(jsonMatch[0]);
-        } catch { }
-      }
-      
-      // Last resort: default response
-      return {
-        type: 'unknown',
-        fixable: false,
-      };
+      console.error('LLM request failed:', err);
+      throw err;
     }
   }
 
-
-  /**
-   * Format DOM elements for LLM context
-   */
   private formatDOMForLLM(elements: any[]): string {
-    if (!elements || elements.length === 0) {
-      return 'No elements found';
-    }
+    if (!elements || elements.length === 0) return 'No elements found';
+    return elements.slice(0, 30).map((el: any, idx: number) => {
+      const role = el.role || 'unknown';
+      const name = el.name || '';
+      const selector = el.selector || '';
+      const type = el.type ? ` (type=${el.type})` : '';
+      const placeholder = el.placeholder ? ` [placeholder="${el.placeholder}"]` : '';
+      return `${idx + 1}. ${name} | Role: ${role}${type}${placeholder} | Selector: ${selector}`;
+    }).join('\n');
+  }
 
-    return elements
-      .slice(0, 30) // Limit to first 30 elements for token efficiency
-      .map((el, idx) => {
-        const role = el.role || 'unknown';
-        const name = el.name || '';
-        const selector = el.selector || '';
-        const type = el.type ? ` (type=${el.type})` : '';
-        const placeholder = el.placeholder ? ` [placeholder="${el.placeholder}"]` : '';
+  private isSelectorError(error: any): boolean {
+    const selectorErrors = [ 'locator not found', 'failed to find element', 'element does not exist', 'querySelector returned null', 'not visible', 'detached from DOM', 'stale element' ];
+    const msg = typeof error === 'string' ? error.toLowerCase() : (error && (error.message || '') ? String(error.message).toLowerCase() : String(error || '').toLowerCase());
+    return selectorErrors.some(k => msg.includes(k));
+  }
 
-        return `${idx + 1}. ${name} | Role: ${role}${type}${placeholder} | Selector: ${selector}`;
-      })
-      .join('\n');
+  /** Heuristic fallback generator */
+  private generateAlternativeHeuristic(error: string, originalSelector?: string): string | null {
+    try {
+      const msg = typeof error === 'string' ? error : (error || '');
+      const src = ((originalSelector || '') + ' ' + msg).trim();
+      const low = src.toLowerCase();
+
+      const candidates: string[] = [];
+
+      // Heuristic hints from error text
+      if (low.includes('password')) candidates.push('[name="password"]', '[type="password"]', 'input[type="password"]');
+      if (low.includes('username')) candidates.push('[name="username"]', 'input[name="username"]', '#username');
+      if (low.includes('email')) candidates.push('input[type="email"]', '[name="email"]');
+
+      // Common submit/button fallbacks
+      candidates.push('button[type="submit"]', 'input[type="submit"]', 'button:has-text("Submit")', 'button:has-text("Log in")', 'button:has-text("Login")', 'button:has-text("Sign in")');
+
+      // If original selector is attribute-style like [name="asdfdpassword"], try variants
+      const attrMatch = (originalSelector || '').match(/\[([a-zA-Z0-9_-]+)=(?:"|')([^"']+)(?:"|')\]/);
+      if (attrMatch) {
+        const attr = attrMatch[1];
+        const val = attrMatch[2];
+        // exact
+        candidates.push(`[${attr}="${val}"]`);
+        // trimmed suffix/prefix
+        const maxTrim = Math.min(6, Math.max(0, val.length - 3));
+        for (let trim = 0; trim <= maxTrim; trim++) {
+          const candidateVal = val.slice(trim).trim();
+          if (candidateVal.length >= 3) candidates.push(`[${attr}="${candidateVal}"]`);
+        }
+        for (let trim = 1; trim <= Math.min(6, val.length - 3); trim++) {
+          const candidateVal = val.slice(0, val.length - trim).trim();
+          if (candidateVal.length >= 3) candidates.push(`[${attr}="${candidateVal}"]`);
+        }
+      }
+
+      // Try to extract id, name, placeholder, aria-label from message
+      const idMatch = msg.match(/id\s*[=:]\s*['"]?([a-zA-Z0-9_-]{2,})['"]?/i);
+      if (idMatch) candidates.push(`#${idMatch[1]}`);
+      const nameMatch = msg.match(/name\s*[=:]\s*['"]?([a-zA-Z0-9_-]{2,})['"]?/i);
+      if (nameMatch) candidates.push(`[name="${nameMatch[1]}"]`, `${nameMatch[1]}`);
+      const placeholderMatch = msg.match(/placeholder\s*[=:]\s*['"]([^'"]{2,})['"]/i);
+      if (placeholderMatch) candidates.push(`[placeholder="${placeholderMatch[1]}"]`, `:text("${placeholderMatch[1]}")`);
+      const ariaMatch = msg.match(/aria-label\s*[=:]\s*['"]([^'"]{2,})['"]/i);
+      if (ariaMatch) candidates.push(`[aria-label="${ariaMatch[1]}"]`, `:text("${ariaMatch[1]}")`);
+
+      // Text based candidates from error or selector name
+      const textHints = [] as string[];
+      const words = (originalSelector || '' + ' ' + msg).match(/[A-Za-z]{3,}/g) || [];
+      for (const w of words.slice(0, 6)) {
+        const loww = w.toLowerCase();
+        if (['login','log','submit','sign','dashboard','password','username','user'].includes(loww)) textHints.push(w);
+      }
+      for (const t of textHints) {
+        candidates.push(`text=${t}`, `:has-text("${t}")`, `button:has-text("${t}")`);
+      }
+
+      // Generic attribute fallbacks
+      candidates.push('[role="button"]', '[data-test-id]', '[data-testid]');
+
+      // Normalize and de-duplicate candidates while preserving order
+      const uniq: string[] = [];
+      for (const c of candidates) {
+        if (!c) continue;
+        const s = c.trim();
+        if (!uniq.includes(s)) uniq.push(s);
+      }
+
+      // Return the first valid selector
+      for (const cand of uniq) {
+        if (isValidSelector(cand)) return cand;
+      }
+    } catch (e) { /* noop */ }
+    return null;
   }
 }
 
+export default FixRecommender;

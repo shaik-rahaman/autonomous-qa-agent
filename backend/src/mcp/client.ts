@@ -342,3 +342,4 @@ export class MCPClient {
 }
 
 export const mcpClient = new MCPClient(process.env.MCP_SERVER_URL);
+console.log('MCP CLIENT LOADED');

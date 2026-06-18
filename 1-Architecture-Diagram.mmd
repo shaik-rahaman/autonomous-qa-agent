@@ -1,0 +1,95 @@
+graph TB
+    subgraph "User Interface Layer"
+        UI["🎨 React Frontend<br/>Port 5173"]
+        JIRA_UI["Jira Integration UI"]
+    end
+
+    subgraph "API Layer"
+        API["Express API Server<br/>Port 3000"]
+        Routes["📍 API Routes<br/>- /generate-test<br/>- /execute<br/>- /tests<br/>- /jira/*"]
+    end
+
+    subgraph "Generation Agent"
+        GenAgent["📝 Test Generation Agent<br/>AgentExecutor"]
+        Gherkin["Gherkin Formatter<br/>English → BDD"]
+        CodeGen["Code Generator<br/>BDD → Playwright"]
+        Validator["🔍 Code Validator<br/>TypeScript Parser"]
+        FileManager["📂 File Manager<br/>Save/Load Tests"]
+    end
+
+    subgraph "Execution Orchestrator"
+        LangChain["🤖 LangChain Orchestrator<br/>AI Decision Engine<br/>with Groq LLM"]
+        Tools["Orchestration Tools<br/>- run_test<br/>- reuse_selector<br/>- heal_test"]
+    end
+
+    subgraph "Execution Agent"
+        Executor["⚙️ Executor Service<br/>Playwright CLI Runner"]
+        PlaywrightTest["npx playwright test<br/>Browser Automation"]
+    end
+
+    subgraph "Self-Healing Agents"
+        Detector["🔎 Failure Detector<br/>Parse error output"]
+        Analyzer["📊 Failure Analyzer<br/>Root cause analysis"]
+        MCP["🔗 MCP Client<br/>Real DOM Analysis"]
+        Recommender["💡 Fix Recommender<br/>AI-powered selectors"]
+        HealExecutor["🏥 Healing Executor<br/>Apply selector fix"]
+    end
+
+    subgraph "Data & Storage"
+        SelectorStore["💾 Selector Store<br/>healing cache"]
+        ExecutionStore["📋 Execution Store<br/>Results DB"]
+    end
+
+    subgraph "External Integrations"
+        JiraAPI["🔌 Jira API<br/>Issue Fetching"]
+        GroqLLM["🧠 Groq LLM<br/>AI Engine"]
+    end
+
+    UI -->|Fetch Issue| JIRA_UI
+    UI -->|Request Test| API
+    UI -->|Execute Test| API
+    UI -->|View Results| API
+
+    API --> Routes
+    Routes -->|/generate-test| GenAgent
+    Routes -->|/execute| LangChain
+    Routes -->|/jira/*| JiraAPI
+
+    GenAgent -->|Convert| Gherkin
+    Gherkin -->|Format| CodeGen
+    CodeGen -->|Generate| Validator
+    Validator -->|Validate| FileManager
+    FileManager -->|Save| ExecutionStore
+
+    LangChain -->|Tool: run_test| Executor
+    LangChain -->|Tool: reuse_selector| SelectorStore
+    LangChain -->|Tool: heal_test| Detector
+    Tools -.->|Powered by| LangChain
+
+    Executor -->|Execute| PlaywrightTest
+    PlaywrightTest -->|Results| ExecutionStore
+
+    PlaywrightTest -->|Failed| Detector
+    Detector -->|Analyze| Analyzer
+    Analyzer -->|Query DOM| MCP
+    MCP -->|AI Analysis| Recommender
+    Recommender -->|Ask LLM| GroqLLM
+    GroqLLM -->|Suggest Selector| HealExecutor
+    HealExecutor -->|Save Fix| SelectorStore
+    HealExecutor -->|Retry| LangChain
+
+    JiraAPI -->|Issue Data| GenAgent
+
+    classDef frontend fill:#4f46e5,stroke:#4338ca,color:#fff
+    classDef agent fill:#f59e0b,stroke:#d97706,color:#fff
+    classDef orchestrator fill:#ec4899,stroke:#be185d,color:#fff
+    classDef selfhealing fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    classDef storage fill:#14b8a6,stroke:#0d9488,color:#fff
+    classDef external fill:#6366f1,stroke:#4f46e5,color:#fff
+
+    class UI,JIRA_UI frontend
+    class GenAgent,Gherkin,CodeGen,Validator,FileManager,Executor agent
+    class LangChain,Tools orchestrator
+    class Detector,Analyzer,MCP,Recommender,HealExecutor selfhealing
+    class SelectorStore,ExecutionStore storage
+    class JiraAPI,GroqLLM,PlaywrightTest external

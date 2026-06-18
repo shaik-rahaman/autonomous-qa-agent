@@ -39,6 +39,7 @@ var __importStar = (this && this.__importStar) || (function () {
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+const path = require('path');
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FixRecommender = void 0;
 const groq_sdk_1 = __importDefault(require("groq-sdk"));
@@ -46,20 +47,42 @@ const groq_sdk_1 = __importDefault(require("groq-sdk"));
 let mcpClientInstance = null;
 async function getMCPClient() {
     if (!mcpClientInstance) {
-        try {
-            const { MCPClient } = await Promise.resolve().then(() => __importStar(require('../../../backend/src/mcp/client')));
-            mcpClientInstance = new MCPClient(process.env.MCP_SERVER_URL);
+        const candidates = [
+            '../../../backend/src/mcp/client',
+            '../../mcp/client',
+            path.resolve(process.cwd(), 'backend', 'src', 'mcp', 'client'),
+            path.resolve(process.cwd(), 'pw-ai-agents', 'src', 'mcp', 'client'),
+        ];
+        for (const p of candidates) {
+            try {
+                const mod = await Promise.resolve().then(() => __importStar(require(p)));
+                if (mod.mcpClient) { mcpClientInstance = mod.mcpClient; console.log('MCP CLIENT LOADED'); return mcpClientInstance; }
+                if (mod.MCPClient) { mcpClientInstance = new mod.MCPClient(process.env.MCP_SERVER_URL); console.log('MCP CLIENT LOADED'); return mcpClientInstance; }
+            }
+            catch (error) {
+                try {
+                    const req = require(p);
+                    if (req.mcpClient) { mcpClientInstance = req.mcpClient; console.log('MCP CLIENT LOADED'); return mcpClientInstance; }
+                    if (req.MCPClient) { mcpClientInstance = new req.MCPClient(process.env.MCP_SERVER_URL); console.log('MCP CLIENT LOADED'); return mcpClientInstance; }
+                }
+                catch (e) {
+                    // continue
+                }
+            }
         }
-        catch (error) {
-            console.error('Failed to load MCP client:', error);
-            throw new Error('MCP client initialization failed');
-        }
+        console.warn('MCP client could not be loaded; continuing without MCP (heuristics only)');
+        return null;
     }
     return mcpClientInstance;
 }
-const groqClient = new groq_sdk_1.default({
-    apiKey: process.env.GROQ_API_KEY,
-});
+// Lazily create Groq client only when GROQ_API_KEY is available
+let groqClient = null;
+function getGroqClient() {
+    if (groqClient) return groqClient;
+    if (!process.env.GROQ_API_KEY) return null;
+    groqClient = new groq_sdk_1.default({ apiKey: process.env.GROQ_API_KEY });
+    return groqClient;
+}
 class FixRecommender {
     /**
      * Generate alternative selector for failed locator with MCP + LLM intelligence
@@ -74,7 +97,8 @@ class FixRecommender {
 
         // Extract full selector pattern from error if present (e.g., getByRole(...))
         try {
-            const selectorMatch = error && error.match && error.match(/getByRole\([^)]*\)/);
+            const text = typeof error === 'string' ? error : (error && error.message) ? error.message : JSON.stringify(error);
+            const selectorMatch = text.match(/getByRole\([^)]*\)/);
             if (selectorMatch && selectorMatch[0]) {
                 originalSelector = originalSelector || selectorMatch[0];
                 console.log(`🔍 Extracted selector from error: ${originalSelector}`);
@@ -89,6 +113,14 @@ class FixRecommender {
                 const llmFix = await this.suggestViaLLMWithDOM(error, originalSelector, url, step || 'unknown');
                 console.log('🧠 LLM/MCP returned:', llmFix);
                 if (llmFix && llmFix.fixed) {
+                    // debug prints
+                    console.log('FAILED:');
+                    console.log(originalSelector);
+                    console.log('CANDIDATES:');
+                    // best-effort candidates list unavailable in this JS file, print diagnostics if present
+                    console.log('SELECTED:');
+                    console.log(llmFix.newSelector);
+                    console.log('CONFIDENCE: LLM');
                     return llmFix;
                 }
             }
@@ -198,7 +230,10 @@ ${domElements}
 
 Please analyze the error and suggest a single, stable selector that should work for this test step. Return ONLY the selector string.`;
         try {
-            const response = await groqClient.chat.completions.create({
+            const client = getGroqClient();
+            if (!client)
+                throw new Error('GROQ_API_KEY not configured - LLM disabled');
+            const response = await client.chat.completions.create({
                 model: process.env.LLM_MODEL || 'mixtral-8x7b-32768',
                 messages: [
                     {
@@ -263,19 +298,45 @@ Please analyze the error and suggest a single, stable selector that should work 
             'detached from DOM',
             'stale element',
         ];
-        return selectorErrors.some(keyword => error.toLowerCase().includes(keyword.toLowerCase()));
+        // TASK 2: Safe error text conversion
+        const errorText = typeof error === 'string' ? error : (error && error.message ? error.message : JSON.stringify(error));
+        return selectorErrors.some(keyword => errorText.toLowerCase().includes(keyword.toLowerCase()));
     }
     /**
      * Fallback: Generate alternative selector patterns using heuristics
      */
     generateAlternativeHeuristic(error, originalSelector) {
+        // TASK 2: Safe error text conversion
+        const errorText = typeof error === 'string' ? error : (error && error.message ? error.message : JSON.stringify(error));
+        const errorLower = errorText.toLowerCase();
+        
+        // TASK 3: Debug print failed selector with type and value
+        console.log('FAILED SELECTOR:');
+        console.log(originalSelector || 'undefined');
+        console.log('TYPE:');
+        console.log(typeof originalSelector);
+        console.log('VALUE:');
+        console.log(originalSelector);
+        
         // Extract potential element info from error message
-        const textMatch = error.match(/(?:text|button|input|field|link)[\s:=]*['""`]([^'""`]+)['""`]/i);
+        const text = errorText;
+        const textMatch = text.match(/(?:text|button|input|field|link)[\s:=]*['"`]([^'"`]+)['"`]/i);
         const textContent = textMatch?.[1];
+        
         // Try different selector strategies in order
         const attempts = [];
+        const candidates = [];
+        
+        // TASK 4: Add deterministic fallback for password/username
+        if (originalSelector && originalSelector.includes('password')) {
+            candidates.push('[name="password"]', 'input[name="password"]', 'input[type="password"]');
+        }
+        if (originalSelector && originalSelector.includes('username')) {
+            candidates.push('[name="username"]', 'input[name="username"]', '#username');
+        }
+        
         // 1. Try role-based if we can infer the element type
-        if (error.toLowerCase().includes('button')) {
+        if (errorLower.includes('button')) {
             attempts.push(`button:has-text("${textContent || 'Login'}")`);
             attempts.push(`[role="button"]`);
         }
@@ -286,7 +347,7 @@ Please analyze the error and suggest a single, stable selector that should work 
             attempts.push(`:text("${textContent}")`);
         }
         // 3. Try input field strategies
-        if (error.toLowerCase().includes('input')) {
+        if (errorLower.includes('input')) {
             attempts.push(`input[type="text"]`);
             attempts.push(`input[placeholder*=""]`);
             attempts.push(`[role="textbox"]`);
@@ -299,6 +360,23 @@ Please analyze the error and suggest a single, stable selector that should work 
         attempts.push(`[class*="btn"]`);
         attempts.push(`[class*="button"]`);
         attempts.push(`[id*="btn"]`);
+        
+        // Combine candidates with attempts
+        const allCandidates = [...new Set([...candidates, ...attempts])];
+        
+        // TASK 5: Print healing candidates
+        console.log('HEALING CANDIDATES:');
+        allCandidates.forEach((candidate, idx) => {
+            console.log(`${idx + 1}. ${candidate}`);
+        });
+        
+        // TASK 6: Select highest confidence candidate (first one after deduplication)
+        if (allCandidates.length > 0) {
+            console.log('SELECTED:');
+            console.log(allCandidates[0]);
+            return allCandidates[0];
+        }
+        
         // Return first viable alternative
         return attempts.length > 0 ? attempts[0] : null;
     }

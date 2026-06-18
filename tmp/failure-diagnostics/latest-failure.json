@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-06-03T16:22:38.939Z",
+  "actualPlaywrightError": {
+    "id": "exec-1780503726020-qf1y725be",
+    "testFile": "test-self-healing.spec.ts",
+    "status": "error",
+    "startTime": "2026-06-03T16:22:06.020Z",
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "totalTests": 0,
+    "stdout": "\nRunning 1 test using 1 worker\n\n\u001b[1A\u001b[2K[1/1] [chromium] › tests/ui/generated/scripts/test-self-healing.spec.ts:4:5 › Login to OrangeHRM and verify dashboard\n\n\u001b[1A\u001b[2K  1) [chromium] › tests/ui/generated/scripts/test-self-healing.spec.ts:4:5 › Login to OrangeHRM and verify dashboard \n\n    \u001b[31mTest timeout of 30000ms exceeded.\u001b[39m\n\n    Error: page.waitForLoadState: Test timeout of 30000ms exceeded.\n\n      10 |     await page.locator(\".oxd-button.oxd-button--medium.oxd-button--main\").click();\n      11 |     await page.waitForURL(/dashboard/i);\n    > 12 |     await page.waitForLoadState(\"networkidle\", { timeout: 60000 });\n         |                ^\n      13 |     await expect(page.getByRole(\"heading\", { name: \"Dashboard\" })).toBeVisible({ timeout: 10000 });\n      14 |   } catch (error) {\n      15 |     console.error(\"Test failed:\", error);\n        at /Users/shaik/backup/NewJob/Courses/testleaf/GenAI_Tool_Developer/apps-developed-github/AITools/hackathon/Autonomous_QA_Agent/pw-ai-agents/tests/ui/generated/scripts/test-self-healing.spec.ts:12:16\n\n    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────\n    test-results/ui-generated-scripts-test--81ada-ngeHRM-and-verify-dashboard-chromium/test-failed-1.png\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────\n    test-results/ui-generated-scripts-test--81ada-ngeHRM-and-verify-dashboard-chromium/video.webm\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n    Error Context: test-results/ui-generated-scripts-test--81ada-ngeHRM-and-verify-dashboard-chromium/error-context.md\n\n    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────\n    test-results/ui-generated-scripts-test--81ada-ngeHRM-and-verify-dashboard-chromium/trace.zip\n    Usage:\n\n        npx playwright show-trace test-results/ui-generated-scripts-test--81ada-ngeHRM-and-verify-dashboard-chromium/trace.zip\n\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n\n\u001b[1A\u001b[2K  1 failed\n    [chromium] › tests/ui/generated/scripts/test-self-healing.spec.ts:4:5 › Login to OrangeHRM and verify dashboard \n",
+    "stderr": "\u001b[1A\u001b[2K[chromium] › tests/ui/generated/scripts/test-self-healing.spec.ts:4:5 › Login to OrangeHRM and verify dashboard\nTest failed: page.waitForLoadState: Test timeout of 30000ms exceeded.\n    at \u001b[90m/Users/shaik/backup/NewJob/Courses/testleaf/GenAI_Tool_Developer/apps-developed-github/AITools/hackathon/Autonomous_QA_Agent/pw-ai-agents/\u001b[39mtests/ui/generated/scripts/test-self-healing.spec.ts:12:16 {\n  \u001b[32mSymbol(step)\u001b[39m: {\n    location: {\n      file: \u001b[32m'/Users/shaik/backup/NewJob/Courses/testleaf/GenAI_Tool_Developer/apps-developed-github/AITools/hackathon/Autonomous_QA_Agent/pw-ai-agents/tests/ui/generated/scripts/test-self-healing.spec.ts'\u001b[39m,\n      line: \u001b[33m12\u001b[39m,\n      column: \u001b[33m16\u001b[39m\n    },\n    category: \u001b[32m'pw:api'\u001b[39m,\n    title: \u001b[32m'Wait for load state \"networkidle\"'\u001b[39m,\n    apiName: \u001b[32m'page.waitForLoadState'\u001b[39m,\n    params: { info: \u001b[36m[Object]\u001b[39m },\n    group: \u001b[90mundefined\u001b[39m,\n    stepId: \u001b[32m'pw:api@40'\u001b[39m,\n    boxedStack: \u001b[90mundefined\u001b[39m,\n    steps: [],\n    attachmentIndices: [],\n    info: TestStepInfoImpl {\n      annotations: [],\n      _testInfo: \u001b[36m[TestInfoImpl]\u001b[39m,\n      _stepId: \u001b[32m'pw:api@40'\u001b[39m,\n      _title: \u001b[32m'Wait for load state \"networkidle\"'\u001b[39m,\n      _parentStep: \u001b[90mundefined\u001b[39m,\n      skip: \u001b[36m[Function (anonymous)]\u001b[39m\n    },\n    complete: \u001b[36m[Function: complete]\u001b[39m,\n    endWallTime: \u001b[33m1780503758667\u001b[39m,\n    error: {\n      message: \u001b[32m'Error: page.waitForLoadState: Test timeout of 30000ms exceeded.'\u001b[39m,\n      stack: \u001b[32m'Error: page.waitForLoadState: Test timeout of 30000ms exceeded.\\n'\u001b[39m +\n        \u001b[32m'    at /Users/shaik/backup/NewJob/Courses/testleaf/GenAI_Tool_Developer/apps-developed-github/AITools/hackathon/Autonomous_QA_Agent/pw-ai-agents/tests/ui/generated/scripts/test-self-healing.spec.ts:12:16'\u001b[39m,\n      cause: \u001b[90mundefined\u001b[39m\n    }\n  }\n}\n",
+    "errors": [
+      "stderr:\nendWallTime: \u001b[33m1780503758667\u001b[39m,\n    error: {\n      message: \u001b[32m'Error: page.waitForLoadState: Test timeout of 30000ms exceeded.'\u001b[39m,\n      stack: \u001b[32m'Error: page.waitForLoadState: Test timeout of 30000ms exceeded.\\n'\u001b[39m +\n        \u001b[32m'    at /Users/shaik/backup/NewJob/Courses/testleaf/GenAI_Tool_Developer/apps-developed-github/AITools/hackathon/Autonomous_QA_Agent/pw-ai-agents/tests/ui/generated/scripts/test-self-healing.spec.ts:12:16'\u001b[39m,\n      cause: \u001b[90mundefined\u001b[39m\n    }\n  }\n}",
+      "stdout:\nUsage:\n\n        npx playwright show-trace test-results/ui-generated-scripts-test--81ada-ngeHRM-and-verify-dashboard-chromium/trace.zip\n\n    ────────────────────────────────────────────────────────────────────────────────────────────────\n\n\n\u001b[1A\u001b[2K  1 failed\n    [chromium] › tests/ui/generated/scripts/test-self-healing.spec.ts:4:5 › Login to OrangeHRM and verify dashboard"
+    ],
+    "endTime": "2026-06-03T16:22:38.936Z",
+    "duration": 32916
+  },
+  "extractedSelector": ".oxd-button.oxd-button--medium.oxd-button--main",
+  "failureType": "UNKNOWN",
+  "confidence": "low",
+  "source": "fallback",
+  "step": "test-self-healing.spec.ts",
+  "url": "unknown",
+  "healedDecision": "rejected",
+  "telemetry": {
+    "healingCategory": "UNKNOWN",
+    "originalLocator": ".oxd-button.oxd-button--medium.oxd-button--main",
+    "confidence": 40,
+    "retryCount": 1,
+    "executionTime": 0,
+    "reason": "Error type not healable: navigation_failure"
+  }
+}

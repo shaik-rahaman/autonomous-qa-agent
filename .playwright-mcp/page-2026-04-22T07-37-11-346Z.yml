@@ -1,0 +1,101 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]: ⚡
+      - generic [ref=e9]:
+        - heading "Autonomous QA Agent" [level=1] [ref=e10]
+        - paragraph [ref=e11]: Enterprise Test Orchestration Platform
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e15]:
+          - paragraph [ref=e16]: ✅ Jira Connected
+          - paragraph [ref=e108]: "Last checked: 13:05:36"
+        - button "🔄" [ref=e109] [cursor=pointer]
+      - generic [ref=e20]: ✅ MCP Connected
+  - generic [ref=e21]:
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e25]: 🔗
+          - generic [ref=e26]:
+            - heading "Jira Integration" [level=2] [ref=e27]
+            - paragraph [ref=e28]: Fetch & transform issues
+        - generic [ref=e30]:
+          - generic [ref=e31]:
+            - generic [ref=e32]:
+              - generic [ref=e33]: 🔗
+              - text: Jira Issue Key
+            - generic [ref=e34]:
+              - textbox "e.g., QA-101, PROJ-456" [ref=e35]
+              - button "🔍" [disabled] [ref=e36]
+          - generic [ref=e37]:
+            - paragraph [ref=e38]: 💡 Enter a Jira issue key to fetch and transform it into test steps
+            - paragraph [ref=e39]: 🤖 Complex content will be enhanced with LLM for better structure
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: 📝
+          - generic [ref=e43]:
+            - heading "Test Input" [level=2] [ref=e44]
+            - paragraph [ref=e45]: Define test steps & URL
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - generic [ref=e48]:
+              - generic [ref=e49]: Test Steps
+              - generic [ref=e50]: 171 chars
+            - textbox "1. Navigate to login page 2. Enter username and password 3. Click login button 4. Verify dashboard appears" [ref=e51]:
+              - /placeholder: "1. Navigate to login page\n2. Enter username and password\n3. Click login button\n4. Verify dashboard appears"
+              - text: 1. Navigate to login page 2. Enter username 'student' in username field 3. Enter password 'Password123' in password field 4. Click login button 5. Verify dashboard appears
+            - paragraph [ref=e52]: Enter test steps in natural language
+          - generic [ref=e53]:
+            - generic [ref=e54]: Target URL
+            - textbox "https://example.com/login" [ref=e55]: https://practicetestautomation.com/practice-test-login/
+            - paragraph [ref=e56]: Full URL to test application
+          - generic [ref=e57]:
+            - button "Generating..." [disabled] [ref=e145]:
+              - generic [ref=e146]: Generating...
+            - button "Clear" [disabled] [ref=e59]
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - generic [ref=e62]: ▶️
+          - generic [ref=e63]:
+            - heading "Execute Test" [level=2] [ref=e64]
+            - paragraph [ref=e65]: Run & monitor execution
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - paragraph [ref=e70]: Status
+            - generic [ref=e72]: 🏃 Running...
+          - button "Execute" [disabled] [ref=e75]:
+            - img [ref=e76]
+            - generic [ref=e78]: Execute
+    - generic [ref=e80]:
+      - heading "Code" [level=2] [ref=e82]
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - paragraph [ref=e116]: navigate-login-page.feature
+            - paragraph [ref=e117]: Version 1
+          - generic [ref=e118]:
+            - button "Copy to clipboard" [disabled] [ref=e119]:
+              - img [ref=e120]
+            - button "Download file" [disabled] [ref=e123]:
+              - img [ref=e124]
+        - generic [ref=e127]:
+          - button "📝 Gherkin" [ref=e128] [cursor=pointer]
+          - button "▶️ Playwright" [ref=e129] [cursor=pointer]
+        - code [ref=e132]: "Feature: User Login Scenario: Successful login Given the user is on the login page When the user enters username 'student' And the user enters password 'Password123' When the user clicks the login button Then the dashboard appears"
+    - generic [ref=e88]:
+      - generic [ref=e90]:
+        - button "●📋 Logs" [ref=e91] [cursor=pointer]
+        - button "📊 Report" [ref=e92] [cursor=pointer]
+      - generic [ref=e95]:
+        - generic [ref=e96]:
+          - generic [ref=e97]:
+            - generic [ref=e98]: 📋
+            - paragraph [ref=e99]: Execution Logs
+            - generic [ref=e100]: "1"
+          - button "Clear logs" [disabled] [ref=e101]:
+            - img [ref=e102]
+        - generic [ref=e133]:
+          - generic [ref=e134]: "[001]"
+          - generic [ref=e135]: ℹ️
+          - generic [ref=e136]: "[INFO] Executing test..."

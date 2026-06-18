@@ -17,7 +17,7 @@ Your responsibilities:
 2. Use exact text from test steps, not generic placeholders
 3. Create intelligent, robust selectors using:
    - HTML attributes (name, id, data-testid, aria-label)
-   - Text content with :has-text() for buttons and labels
+   - Text content with getByText() or getByRole() for buttons and labels
    - Role-based selectors when appropriate
 4. Generate complete test files with proper imports and structure
 5. Include proper error handling and waits
@@ -25,14 +25,26 @@ Your responsibilities:
 7. DO NOT use generic placeholders - use exact values from test steps
 
 CRITICAL CODE FORMATTING - LOCATOR QUOTE RULES:
-- For page.locator() with attribute selectors: USE SINGLE QUOTES
-  - Correct: page.locator('input[name="USERNAME"]')
-  - Wrong: page.locator("input[name=\"USERNAME\"]")
+- For page.locator() with attribute selectors: ALWAYS USE SINGLE QUOTES for the selector string, even if the selector contains double quotes inside (e.g., page.locator('input[name="username"]')).
+  - Correct: page.locator('input[name="username"]')
+  - Wrong: page.locator("[name=\"username\"]")
+  - Wrong: page.locator("[name="username"]")
+- Never use double quotes to wrap a selector string that itself contains double quotes.
 - For other strings: USE DOUBLE QUOTES
   - Correct: await page.goto("https://example.com");
   - Correct: await expect(element).toBeVisible();
 - For getByRole with regex name: USE DOUBLE QUOTES for property
   - Correct: page.getByRole("button", { name: /Login/i })
+
+IMPORTANT: For Dashboard verification:
+- Never use page.getByText(/Dashboard/i) alone
+- Instead, use strong waits FIRST:
+  await page.waitForURL(/dashboard/i);
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(3000);
+  
+- Then verify with role-based selector:
+  await expect(page.getByRole("heading", { name: /Dashboard/i })).toBeVisible({ timeout: 10000 });
 
 Key rules:
 - Extract username/password/URL exactly as provided in test steps
@@ -41,7 +53,7 @@ Key rules:
 - Use page.getByRole() for semantic elements (buttons, links, etc)
 - Use exact selectors based on the target website structure
 - Generate assertions that verify actual success criteria
-- Include page load waits and element visibility checks`;
+- Include page load waits and element visibility checks with reasonable timeouts`;
 
 export class LLMService {
   /**
@@ -204,6 +216,12 @@ export class LLMService {
           code = match[1];
         }
       }
+
+      // Fix broken locator lines with double quotes inside double quotes
+      code = code.replace(/page\.locator\("([^"]*\"[^"]*)"\)/g, (match, selector) => {
+        // If the selector contains double quotes, wrap with single quotes
+        return `page.locator('${selector}')`;
+      });
 
       // Format code with Prettier to ensure compliance
       code = this.formatCodeWithPrettier(code);

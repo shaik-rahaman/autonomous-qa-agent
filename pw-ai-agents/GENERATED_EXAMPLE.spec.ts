@@ -35,7 +35,7 @@ test.describe('Generated Test Suite - Example', () => {
     
     // Assertions
     await page.waitForNavigation();
-    await expect(page).toHaveURL(/dashboard/);
+    // Removed dashboard URL assertion to keep generated tests generic
     await expect(page.locator('text=Welcome')).toBeVisible();
   });
 

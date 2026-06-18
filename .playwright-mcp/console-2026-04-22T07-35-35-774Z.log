@@ -1,0 +1,17 @@
+[     129ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/chunk-PJEEZAML.js?v=eb5bf353:21550
+[     172ms] [LOG] ScriptEditor Debug: {hasGherkin: false, hasScript: false, gherkinLength: 0, scriptLength: 0, fileName: } @ http://localhost:5173/src/components/ScriptEditor.tsx:27
+[     172ms] [LOG] ScriptEditor Debug: {hasGherkin: false, hasScript: false, gherkinLength: 0, scriptLength: 0, fileName: } @ http://localhost:5173/src/components/ScriptEditor.tsx:27
+[   40324ms] [LOG] 🔍 API Response Full: {fileName: navigate-login-page.spec.ts, code: import { test, expect } from "@playwright/test";
+
+…("Test failed:", error);
+    throw error;
+  }
+});, gherkin: Feature: User Login
+  Scenario: Successful login
+ …s the login button
+    Then the dashboard appears, timestamp: 2026-04-22T07:36:16.094Z, version: 1} @ http://localhost:5173/src/App.tsx:77
+[   40324ms] [LOG] 🔍 API Response Debug: {hasGherkin: true, gherkinLength: 252, hasScript: true, scriptLength: 590, fileName: navigate-login-page.spec.ts} @ http://localhost:5173/src/App.tsx:78
+[   40324ms] [LOG] 🔍 After setScript, state should have gherkin: {gherkin: Feature: User Login
+  Scenario: Successful login
+ } @ http://localhost:5173/src/App.tsx:87
+[   40326ms] [LOG] ScriptEditor Debug: {hasGherkin: true, hasScript: true, gherkinLength: 252, scriptLength: 590, fileName: navigate-login-page.spec.ts} @ http://localhost:5173/src/components/ScriptEditor.tsx:27

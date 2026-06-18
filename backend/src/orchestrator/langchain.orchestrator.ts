@@ -10,6 +10,7 @@ import { logger } from "../utils/logger";
 import { executorService, ExecutionResult } from "../execution/executor-service";
 import { healFailure, HealFailureInput } from "../agents/self-healing";
 import { findSelectorFix, saveSelectorFix } from "../self-healing/selector-store";
+import { scriptExecutor } from "../services/script-executor";
 import path from "path";
 import fs from "fs";
 
@@ -41,12 +42,11 @@ function createOrchestrationTools(testFilesPath: string) {
       }),
       func: async (input: { testFile: string; overrideSelector?: string }) => {
         try {
-          logger.info(`🧪 [Tool] Running test: ${input.testFile}`);
-          const result = await executorService.executeTest(input.testFile, { overrideSelector: input.overrideSelector });
+          const execResult = await executorService.executeTest(input.testFile, input.overrideSelector ? { overrideSelector: input.overrideSelector } : undefined);
           return JSON.stringify({
-            status: result.status,
-            passed: result.status === "passed",
-            errors: result.errors || [],
+            status: execResult.status,
+            passed: execResult.status === "passed",
+            errors: execResult.errors || [],
           });
         } catch (error) {
           return JSON.stringify({
@@ -109,8 +109,9 @@ function createOrchestrationTools(testFilesPath: string) {
         errorMessage: z.string().describe("The error message from the test failure"),
         failedSelector: z.string().describe("The selector that failed"),
         targetUrl: z.string().describe("The target URL"),
+        errorObject: z.any().optional().describe("Optional structured error object from Playwright"),
       }),
-      func: async (input: { testFile: string; errorMessage: string; failedSelector: string; targetUrl: string }) => {
+      func: async (input: { testFile: string; errorMessage: string; failedSelector: string; targetUrl: string; errorObject?: any }) => {
         try {
           logger.info(`🏥 [Tool] Healing test failure`);
 
@@ -120,6 +121,11 @@ function createOrchestrationTools(testFilesPath: string) {
             selector: input.failedSelector,
             url: input.targetUrl || "unknown",
           };
+          // If a structured error object was provided by the orchestrator, attach it to the input
+          if ((input as any).errorObject) {
+            // Overwrite the `error` field to pass the structured object through
+            healInput.error = (input as any).errorObject;
+          }
 
           const healOutput = await healFailure(healInput);
 
@@ -209,8 +215,9 @@ export async function runWithLangChain(
   try {
     logger.section(`🤖 [LangChain] Starting orchestration with Agent for: ${testFile}`);
 
-    // Use singleton executor service (properly configured with correct paths)
-    const testFilesPath = path.join(projectRoot, "..", "pw-ai-agents", "tests", "ui", "generated", "scripts");
+    // FIX 2: Use centralized path resolution - resolved by scriptExecutor
+    // This ensures consistent path regardless of where server is started from
+    const testFilesPath = scriptExecutor.getGeneratedScriptsDirectory();
 
     // Create tools
     const tools = createOrchestrationTools(testFilesPath);
@@ -255,64 +262,131 @@ Always follow this sequence:
     let healed = false;
     let reused = false;
 
-    // Step 1: Check for reused selector
-    logger.info(`📋 Step 1: Checking for previously healed selector...`);
-    const reuseResult = await tools[1].func({ testFile, targetUrl });
-    const reuseData = JSON.parse(reuseResult as string);
-    logger.info(`[Agent Decision] reuse_selector returned: ${JSON.stringify(reuseData)}`);
+    // Step 1: Run test for the first time (NO reuse of selectors on first run to avoid corrupted data)
+    logger.info(`🧪 Step 1: Running test for first time...`);
+    result = await executorService.executeTest(testFile);
+    logger.info(`[Agent Decision] run_test returned: status=${result.status}, passed=${result.status === "passed"}`);
 
-      if (reuseData.found) {
-      logger.success(`✅ [Agent] Found previously healed selector: ${reuseData.healedSelector}`);
-      reused = true;
-      
-      // Step 2: Run test with reused selector
-      logger.info(`🔄 Step 2: Running test with reused selector...`);
-        const runResult = await tools[0].func({ testFile, overrideSelector: reuseData.healedSelector });
-        result = await executorService.executeTest(testFile, { overrideSelector: reuseData.healedSelector });
-        result.status = JSON.parse(runResult as string).status;
-      logger.info(`[Agent Decision] run_test returned: ${runResult}`);
-
-      if (JSON.parse(runResult as string).passed) {
-        logger.success(`✅ [Agent] Test passed with reused selector!`);
-        return createResult(result, healed, reused);
-      }
+    if (result.status === "passed") {
+      logger.success(`✅ [Agent] Test passed on first attempt!`);
+      return createResult(result, healed, reused);
     }
 
-    // Step 3: Run test for the first time
-    if (!result) {
-      logger.info(`🧪 Step 3: Running test for first time...`);
-      const runResult = await tools[0].func({ testFile });
-      const runData = JSON.parse(runResult as string);
-      result = await executorService.executeTest(testFile);
-      result.status = runData.status;
-      logger.info(`[Agent Decision] run_test returned: ${runResult}`);
-
-      if (runData.passed) {
-        logger.success(`✅ [Agent] Test passed on first attempt!`);
-        return createResult(result, healed, reused);
-      }
-    }
-
-    // Step 4: Test failed, CALL HEAL_TEST
-    if (result && result.status === "failed") {
+    // Step 2: Test failed or errored, CHECK FOR SYNTAX ERROR FIRST
+    if (result && (result.status === "failed" || result.status === "error")) {
       logger.error(`❌ [LangChain] Test FAILED: ${result.status}`);
-      logger.info(`🔍 Error output: ${(result.stderr || result.stdout || "").substring(0, 200)}...`);
       
-      // Read the test file to extract the failed selector
-      const testFilePath = path.join(testFilesPath, testFile);
-      let fileContent = '';
-      let failedSelector = 'unknown_selector';
+      const errorOutput = (result.stderr || result.stdout || "").substring(0, 500);
+      logger.info(`🔍 Error output: ${errorOutput}`);
+      
+      // ⚠️  CHECK FOR SYNTAX ERROR - DO NOT HEAL SYNTAX ERRORS
+      if (errorOutput.includes("SyntaxError")) {
+        logger.error(`❌ CRITICAL: Generated script contains SyntaxError`);
+        logger.error(`⏹️  Skipping healing - syntax error cannot be healed by selector replacement`);
+        logger.error(`📝 Syntax errors require generation fix, not healing`);
+        
+        // Return immediately without attempting healing
+        return {
+          ...result,
+          healed: false,
+          reused: false,
+        };
+      }
+      
+      // FIX 3-5: Use lastReachedLocator from execution instead of file read
+      // This is more reliable and doesn't require file system access
+      let failedSelector = '';
+      
+      // TASK 1: Comprehensive error and selector logging
+      console.log(`\n[ORCHESTRATOR] Healing Pipeline Initiated`);
+      console.log(`[ORCHESTRATOR] Playwright Error:\n${result.stderr || result.stdout || '(no error captured)'}`);
+      console.log(`[ORCHESTRATOR] lastReachedLocator from execution: ${(result as any).lastReachedLocator || 'N/A'}`);
       
       try {
-        fileContent = fs.readFileSync(testFilePath, 'utf-8');
+        // TASK 3: Check for navigation timeout
+        const isNavigationTimeout = /page\.goto.*timeout|waitForURL.*timeout|navigation.*timeout/i.test(
+          result.stderr + result.stdout
+        );
         
-        // Try to extract the failed selector from test file
-        const selectorMatch = fileContent.match(/getByRole\('button',\s*\{\s*name:\s*\/([^/]+)\//);
-        if (selectorMatch) {
-          failedSelector = selectorMatch[1];
+        if (isNavigationTimeout) {
+          console.log(`[ORCHESTRATOR] ⚠️  NAVIGATION TIMEOUT DETECTED`);
+          console.log(`[ORCHESTRATOR] Classification: NAVIGATION_TIMEOUT`);
+          console.log(`[ORCHESTRATOR] Action: SKIP HEALING - navigation failures are not locator issues`);
+          
+          // TASK 4: Skip healing for navigation timeouts
+          logger.info(`⏭️  Navigation timeout detected - skipping locator healing`);
+          return {
+            ...result,
+            healed: false,
+            reused: false,
+          };
         }
+        
+        // FIX 4: Use lastReachedLocator from execution output (more reliable)
+        // This is populated by executor-service and includes the HEALING LAB instrumentation
+        const lastReached = (result as any).lastReachedLocator;
+        if (lastReached) {
+          failedSelector = lastReached;
+          console.log(`[ORCHESTRATOR] ✓ PRIORITY 1 (EXECUTION OUTPUT) - lastReachedLocator: ${failedSelector}`);
+          console.log(`[ORCHESTRATOR] SELECTOR_SOURCE: Execution lastReachedLocator (MOST RELIABLE)`);
+          console.log(`[ORCHESTRATOR] FAILED SELECTOR: ${failedSelector}`);
+        } else {
+          // Fallback: Extract from ACTUAL PLAYWRIGHT ERROR
+          const errorText = result.stderr + '\n' + result.stdout;
+          const cleanedErrorText = String(errorText || '').replace(/\x1B\[[0-9;]*m/g, '');
+          
+          // PRIORITY 2: Look for params.selector in error
+          let paramsSelectorMatch = errorText.match(/params\.selector\s*[=:]\s*['"]([^'"]+)['"]/);
+          if (paramsSelectorMatch && paramsSelectorMatch[1]) {
+            failedSelector = paramsSelectorMatch[1];
+            console.log(`[ORCHESTRATOR] ✓ PRIORITY 2 - params.selector: ${failedSelector}`);
+            console.log(`[ORCHESTRATOR] SELECTOR_SOURCE: Playwright params.selector`);
+          } else {
+            // PRIORITY 3: Look for bracket notation from "waiting for locator(...)\" pattern
+            const waitingMatch = cleanedErrorText.match(/waiting for\s+locator\s*\(\s*([^)]+)\)/i);
+            if (waitingMatch && waitingMatch[1]) {
+              let candidate = waitingMatch[1].trim();
+              if ((candidate.startsWith('"') && candidate.endsWith('"')) || (candidate.startsWith('\'') && candidate.endsWith('\''))) {
+                candidate = candidate.slice(1, -1);
+              }
+              failedSelector = candidate.trim();
+              console.log(`[ORCHESTRATOR] ✓ PRIORITY 3 - bracket notation: ${failedSelector}`);
+            }
+          }
+        }
+        
+        // CRITICAL: If no selector found, this is a non-locator failure - don't attempt healing
+        if (!failedSelector) {
+          console.log(`[ORCHESTRATOR] ❌ EXTRACTED_FAILED_LOCATOR: NOT FOUND`);
+          console.log(`[ORCHESTRATOR] Reason: No locator info in execution output or error`);
+          console.log(`[ORCHESTRATOR] Action: SKIP HEALING - not a locator failure`);
+          console.log(`[ORCHESTRATOR] lastReachedLocator: ${(result as any).lastReachedLocator || 'N/A'}`);
+          logger.warn(`No locator found - skipping healing`);
+          return {
+            ...result,
+            healed: false,
+            reused: false,
+          };
+        }
+        
+        console.log(`[ORCHESTRATOR] EXTRACTED_FAILED_LOCATOR: ${failedSelector}`);
+        
+        // Validate selector format
+        if (!failedSelector || typeof failedSelector !== 'string' || failedSelector.length < 2) {
+          logger.error('❌ Invalid selector format');
+          console.error(`[ORCHESTRATOR] ❌ Selector validation failed: ${failedSelector}`);
+          return createResult(result, healed, reused);
+        }
+        
+        // FIX 6: Add detailed healing logs
+        console.log(`[ORCHESTRATOR] ==========================================`);
+        console.log(`[ORCHESTRATOR] HEALING PHASE INITIATED`);
+        console.log(`[ORCHESTRATOR] FAILED SELECTOR: ${failedSelector}`);
+        console.log(`[ORCHESTRATOR] HEALING_CANDIDATES: (pending LLM evaluation)`);
+        console.log(`[ORCHESTRATOR] ==========================================`);
       } catch (readErr) {
-        logger.warn(`Could not read test file for healing: ${readErr}`);
+        // FIX 5: Continue healing even if file read fails (not needed for selector extraction anymore)
+        logger.debug(`Selector extraction note: ${readErr}`);
       }
       
       // Prepare error message
@@ -322,45 +396,119 @@ Always follow this sequence:
         (result.errors || []).join('\n')
       ].filter(e => e).join('\n');
 
-      logger.info(`🏥 Step 4: Triggering heal_test tool...`);
+      logger.info(`🏥 Step 2: Triggering heal_test tool...`);
       logger.info(`   - Test: ${testFile}`);
       logger.info(`   - Failed Selector: ${failedSelector}`);
       logger.info(`   - Target URL: ${targetUrl}`);
+      
+      console.log(`[ORCHESTRATOR] Calling heal_test with:`);
+      console.log(`  - Failed Selector: ${failedSelector}`);
+      console.log(`  - Target URL: ${targetUrl}`);
 
-      // Call heal_test tool
+      // Call heal_test tool (TASK 1: Pass correct failed selector)
+      console.log(`[ORCHESTRATOR] ========== CALLING heal_test ==========`);
+      console.log(`[ORCHESTRATOR] ORIGINAL_SELECTOR: ${failedSelector}`);
+      console.log(`[ORCHESTRATOR] TARGET_URL: ${targetUrl}`);
+      console.log(`[ORCHESTRATOR] ERROR_SUMMARY: ${errorMessage.substring(0, 150)}`);
+      console.log(`[ORCHESTRATOR] ==========================================`);
+      
       const healResult = await tools[2].func({
         testFile,
         errorMessage: errorMessage.substring(0, 500), // Limit error message
         failedSelector: failedSelector,
         targetUrl: targetUrl,
+        errorObject: result, // Pass the full execution result object for deep extraction
       });
 
       const healData = JSON.parse(healResult as string);
       logger.info(`[Agent Decision] heal_test returned: ${JSON.stringify(healData)}`);
+      
+      // TASK 1: Console logging for result handling
+      console.log(`[ORCHESTRATOR] Heal Result:`, JSON.stringify(healData, null, 2));
 
-        if (healData.fixed) {
-        logger.success(`✅ [Agent] Healing successful (${healData.action || healData.reason})`);
-        healed = true;
+      // TASK 4: If healing failed (not healable or MCP unavailable), stop and don't attempt retry
+      if (!healData.fixed) {
+        logger.warn(`❌ [Agent] Healing failed: ${healData.reason || 'unknown reason'}`);
+        logger.info(`⏭️  [Agent] Skipping retry - healing unavailable`);
+        console.log(`[ORCHESTRATOR] ⏭️  Healing skipped - reason: ${healData.reason}`);
+        // FIX 6: Log failed selection
+        console.log(`[ORCHESTRATOR] HEALING_FAILURE: No candidates found or MCP unavailable`);
+        healed = false;
+        return createResult(result, healed, reused);
+      }
 
-        // Step 5: Retry test with healed selector/strategy
-        logger.info(`🔄 Step 5: Retrying test with healed strategy...`);
-          const retryResult = await tools[0].func({ testFile, overrideSelector: healData.newSelector });
-          const retryData = JSON.parse(retryResult as string);
-          result = await executorService.executeTest(testFile, { overrideSelector: healData.newSelector });
-          result.status = retryData.status;
-        logger.info(`[Agent Decision] run_test (retry) returned: ${JSON.stringify(retryData)}`);
+      if (healData.fixed && healData.newSelector) {
+        logger.success(`✅ [Agent] Healing generated fix (${healData.action || healData.reason})`);
+        logger.info(`   Failed selector: ${failedSelector}`);
+        logger.info(`   Healed selector: ${healData.newSelector}`);
+        
+        // FIX 6: Log healing candidate selection
+        console.log(`[ORCHESTRATOR] ==========================================`);
+        console.log(`[ORCHESTRATOR] HEALING CANDIDATES EVALUATED`);
+        console.log(`[ORCHESTRATOR] SELECTED: ${healData.newSelector}`);
+        console.log(`[ORCHESTRATOR] STRATEGY: ${healData.action || healData.reason}`);
+        console.log(`[ORCHESTRATOR] ==========================================`);
+        
+        console.log(`[ORCHESTRATOR] ✅ Healing generated fix`);
+        console.log(`[ORCHESTRATOR]   - Failed: ${failedSelector}`);
+        console.log(`[ORCHESTRATOR]   - Healed: ${healData.newSelector}`);
 
-        if (retryData.passed) {
+        // Step 3: Retry test with healed selector/strategy
+        logger.info(`🔄 Step 3: Retrying test with healed selector...`);
+        
+        // TASK 8: Log healed selector and retry execution
+        console.log(`[HEALING] ==========================================`);
+        console.log(`[HEALING] HEALED SELECTOR:`);
+        console.log(`[HEALING] ${healData.newSelector}`);
+        console.log(`[HEALING] ==========================================`);
+        console.log(`[HEALING] RETRYING TEST...`);
+        
+        // FIX 6: Log retry execution
+        console.log(`[ORCHESTRATOR] ==========================================`);
+        console.log(`[ORCHESTRATOR] RETRY EXECUTED WITH HEALED SELECTOR`);
+        console.log(`[ORCHESTRATOR] HEALING SELECTOR: ${healData.newSelector}`);
+        console.log(`[ORCHESTRATOR] ==========================================`);
+        
+        result = await executorService.executeTest(testFile, { 
+          overrideSelector: healData.newSelector,
+          failedLocator: failedSelector,  // Pass the actual failed locator
+        });
+        logger.info(`[Agent Decision] run_test (retry) returned: status=${result.status}`);
+        
+        console.log(`[ORCHESTRATOR] Retry result: ${result.status}`);
+
+        // FIXED: Only mark as healed if RETRY PASSED
+        if (result.status === "passed") {
           logger.success(`✅ [Agent] Test PASSED after healing and retry!`);
-          return createResult(result, healed, reused);
+          logger.info(`   ✓ Healing validation: selector valid, retry executed, test passed`);
+          console.log(`[ORCHESTRATOR] ✅ RETRY PASSED - Healing successful`);
+          // FIX 6: Log passing result
+          console.log(`[ORCHESTRATOR] ==========================================`);
+          console.log(`[ORCHESTRATOR] HEALING COMPLETE - TEST PASSED`);
+          console.log(`[ORCHESTRATOR] FAILED_SELECTOR: ${failedSelector}`);
+          console.log(`[ORCHESTRATOR] HEALED_SELECTOR: ${healData.newSelector}`);
+          console.log(`[ORCHESTRATOR] ==========================================`);
+          healed = true;  // Only set to true here if retry actually passed
+          
+          // Populate healingDetails with failed and healed locators
+          const healedResult: LangChainOrchestrationResult = {
+            ...result,
+            healed,
+            reused,
+            healingDetails: {
+              originalSelector: failedSelector,
+              newSelector: healData.newSelector,
+              strategy: healData.action || 'automatic_healing',
+            },
+          };
+          return healedResult;
         } else {
           logger.warn(`⚠️ [Agent] Test still failing after healing attempt`);
+          logger.warn(`   Healing was attempted but retry did not pass`);
+          console.warn(`[ORCHESTRATOR] ⚠️  Retry failed after healing - healing did not help`);
+          healed = false;  // Healing failed because retry did not pass
           return createResult(result, healed, reused);
         }
-      } else {
-        logger.warn(`❌ [Agent] Healing not possible: ${healData.reason}`);
-        logger.info(`⏭️  [Agent] Skipping retry - issue not fixable`);
-        return createResult(result, healed, reused);
       }
     }
 

@@ -1,1 +1,373 @@
-[]
+[
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776825371244
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776825492875
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776841172473
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776841800476
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776841836988
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776842042083
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776843044157
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776843125453
+  },
+  {
+    "step": "navigate-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776843435553
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776844550224
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776844660410
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776844725581
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776844741367
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776844811913
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776845080340
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776872118163
+  },
+  {
+    "step": "open-login-page.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1776872491674
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "input[type=\"text\"]",
+    "createdAt": 1779864164475
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1779864863303
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1779865260429
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1780132115477
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1780132455821
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1780133237959
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1780204037416
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1780204909727
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1780205556813
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "unknown_selector",
+    "healedSelector": "unknown_selector:visible",
+    "createdAt": 1780222287845
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "getByText(\"Dashboard\")",
+    "healedSelector": "getByText(\"Dashboard\"):visible",
+    "createdAt": 1780226412890
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "getByText(/Dashboard/i)",
+    "healedSelector": "getByText(/Dashboard/i):visible",
+    "createdAt": 1780227054556
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "getByText(\"Dashboard\")",
+    "healedSelector": "getByText(\"Dashboard\"):visible",
+    "createdAt": 1780229183878
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "getByText(/Dashboard/i)",
+    "healedSelector": "getByText(/Dashboard/i):visible",
+    "createdAt": 1780229833270
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "getByText(/Dashboard/i)",
+    "healedSelector": "getByText(/Dashboard/i):visible",
+    "createdAt": 1780230790081
+  },
+  {
+    "step": "validate-login-dashboard.spec.ts",
+    "url": "unknown",
+    "originalSelector": "getByRole(\"heading\", { name: /dashboard/i })",
+    "healedSelector": "input[type=\"text\"]",
+    "createdAt": 1780231475078
+  },
+  {
+    "step": "temp-1780285240005-aa3dcca2.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780285273421
+  },
+  {
+    "step": "temp-1780285460777-f583b870.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780285493865
+  },
+  {
+    "step": "temp-1780286278028-92d643da.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780286310921
+  },
+  {
+    "step": "temp-1780288032395-8ba50001.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByText(/Dashboard/i)",
+    "healedSelector": "getByText(/Dashboard/i):visible",
+    "createdAt": 1780288065832
+  },
+  {
+    "step": "temp-1780288329162-2b3f645e.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780288363098
+  },
+  {
+    "step": "temp-1780311217690-c1f154b7.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780311251051
+  },
+  {
+    "step": "temp-1780311747212-a56aa7f0.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780311780652
+  },
+  {
+    "step": "temp-1780311830174-9c51f265.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780311862908
+  },
+  {
+    "step": "temp-1780316052429-b31fa077.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780316086260
+  },
+  {
+    "step": "temp-1780317200195-3d4ad45e.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780317233510
+  },
+  {
+    "step": "temp-1780317832232-c4729d4d.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByText(/Dashboard/i)",
+    "healedSelector": "getByText(/Dashboard/i):visible",
+    "createdAt": 1780317865261
+  },
+  {
+    "step": "temp-1780323847311-f0fbd9d2.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "getByRole(\"heading\", { name: \"Dashboard\" })",
+    "healedSelector": "getByRole(\"heading\", { name: \"Dashboard\" }):visible",
+    "createdAt": 1780323880540
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "#broken-username-selector",
+    "healedSelector": "#broken-username-selector:visible",
+    "createdAt": 1780408060931
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "#broken-username-selector",
+    "healedSelector": "#broken-username-selector:visible",
+    "createdAt": 1780408102851
+  },
+  {
+    "step": "temp-1780663333181-55d0467f.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1780663580601
+  },
+  {
+    "step": "temp-1780668752550-f2da89fc.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1780669010562
+  },
+  {
+    "step": "temp-1780670616049-13523e2e.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1780670867326
+  },
+  {
+    "step": "temp-1780671300763-d4510adc.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1780671558325
+  },
+  {
+    "step": "temp-1780672272490-9320f808.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1780672504044
+  },
+  {
+    "step": "temp-1780674087678-9fbe3a09.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1780674334311
+  }
+]

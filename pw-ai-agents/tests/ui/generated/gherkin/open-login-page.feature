@@ -1,7 +1,7 @@
-Feature: CRM Login
-  Scenario: Successful login to CRM
+Feature: Student Login
+  Scenario: Successful student login
     Given the user opens the login page
-    When the user enters the username "demosalesmanager"
-    And the user enters the password "crmsfa"
-    And the user clicks the login button
-    Then the CRM link should appear
+    When the user enters the username "student"
+    And the user enters the password "Password123"
+    And clicks the login button
+    Then the user should see the message "Congratulations student. You successfully logged in"

@@ -1,0 +1,24 @@
+graph TB
+    subgraph Demo["🎬 DEMO FLOW - 3 SIMPLE STEPS"]
+        
+        Step1["<b>STEP 1: Fetch from Jira</b><br/>🎯 Goal: Get test scenario<br/><br/>User Action:<br/>1. Click 'Fetch Jira Issue'<br/>2. Enter issue key (GEN-27)<br/>3. View issue description<br/><br/>Agents: Jira Connector"]
+        
+        Step2["<b>STEP 2: Generate Test</b><br/>🎯 Goal: Create Playwright code<br/><br/>User Action:<br/>1. Click 'Generate Test'<br/>2. System processes via LLM<br/>3. View generated code<br/><br/>Agents: Generation Agent<br/>- English → Gherkin<br/>- Gherkin → Playwright<br/>- Validate TypeScript"]
+        
+        Step3["<b>STEP 3: Execute & Heal</b><br/>🎯 Goal: Run test (auto-fix if fails)<br/><br/>User Action:<br/>1. Click 'Execute Test'<br/>2. Watch browser automation<br/>3. View results + healing stats<br/><br/>Agents: Orchestrator + Self-Healing<br/>- Run test<br/>- Detect failure<br/>- Analyze & recommend fix<br/>- Retry with healed selector"]
+    end
+    
+    subgraph Results["📊 DEMO RESULTS"]
+        R1["✅ Test Execution Complete<br/><br/>Results:<br/>• Status: PASSED<br/>• Duration: 3.1s<br/>• Browser: Chromium<br/>• Healed: Yes/No<br/>• Report: HTML available"]
+    end
+    
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 --> Results
+    
+    style Demo fill:#f0f9ff,stroke:#0284c7,stroke-width:2px
+    style Step1 fill:#dbeafe,stroke:#0284c7
+    style Step2 fill:#bae6fd,stroke:#0284c7
+    style Step3 fill:#7dd3fc,stroke:#0284c7
+    style Results fill:#d1fae5,stroke:#059669,stroke-width:2px
+    style R1 fill:#d1fae5,stroke:#059669

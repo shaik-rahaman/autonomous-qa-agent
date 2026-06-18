@@ -67,9 +67,11 @@ class FailureDetector {
      * Check if error is a common known issue
      */
     isKnownIssue(error) {
+        // TASK 2: Safe error text conversion
+        const errorText = typeof error === 'string' ? error : (error && error.message ? error.message : JSON.stringify(error));
         return Object.values(this.failurePatterns)
             .flat()
-            .some(keyword => error.toLowerCase().includes(keyword));
+            .some(keyword => errorText.toLowerCase().includes(keyword));
     }
 }
 exports.FailureDetector = FailureDetector;

@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test';
  */
 export async function gotoAndWait(page: Page, path: string): Promise<void> {
   await page.goto(path);
-  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
 }
 
 /**
@@ -19,10 +19,8 @@ export async function waitForVisible(page: Page, selector: string): Promise<void
  * Click an element and wait for navigation to complete.
  */
 export async function clickAndNavigate(page: Page, selector: string): Promise<void> {
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle' }),
-    page.click(selector),
-  ]);
+  await page.click(selector);
+  await page.waitForTimeout(2000);
 }
 
 /**

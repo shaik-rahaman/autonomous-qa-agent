@@ -18,6 +18,7 @@ import { ExecutorService, ExecutionResult } from '../execution/executor-service'
 import { healFailure, HealFailureInput, HealFailureOutput } from '../agents/self-healing';
 import { saveSelectorFix, findSelectorFix } from '../self-healing/selector-store';
 import { runWithLangChain } from './langchain.orchestrator';
+import { scriptExecutor } from '../services/script-executor';
 
 export interface TimelineEvent {
   stage: 'run' | 'fail' | 'heal' | 'retry' | 'success';
@@ -32,10 +33,9 @@ export interface OrchestrationResult extends ExecutionResult {
   timeline: TimelineEvent[];
   reused?: boolean;
   healingDetails?: {
-    originalError: string;
     originalSelector: string;
     newSelector: string;
-    retryStatus: string;
+    strategy?: string;
   };
 }
 
@@ -46,9 +46,12 @@ export class TestOrchestrator {
   private maxRetries = 1; // Only one retry
 
   constructor(projectRoot?: string) {
-    this.projectRoot = projectRoot || '.';
-    this.testFilesPath = path.join(this.projectRoot, '..', 'pw-ai-agents', 'tests', 'ui', 'generated', 'scripts');
-    this.executorService = new ExecutorService(projectRoot);
+    // TASK 1: Use reliable repo root resolution (not process.cwd())
+    // Compute repo root the same way scriptExecutor does: relative to this file
+    this.projectRoot = projectRoot || path.resolve(__dirname, '..', '..', '..');
+    // TASK 1: Use scriptExecutor for all path resolution (single source of truth)
+    this.testFilesPath = scriptExecutor.getGeneratedScriptsDirectory();
+    this.executorService = new ExecutorService(this.projectRoot);
   }
 
   /**
@@ -136,7 +139,7 @@ export class TestOrchestrator {
   /**
    * Check if error is related to selector/locator
    */
-  private isSelectorError(error: string): boolean {
+  private isSelectorError(error: any): boolean {
     const selectorIndicators = [
       'locator not found',
       'failed to find element',
@@ -148,27 +151,39 @@ export class TestOrchestrator {
       'stale element',
     ];
 
-    return selectorIndicators.some(indicator => 
-      error.toLowerCase().includes(indicator)
-    );
+    const msg = typeof error === 'string' ? error.toLowerCase() : ((error as any) && ((error as any).message || '') ? String((error as any).message).toLowerCase() : String(error || '').toLowerCase());
+    return selectorIndicators.some(indicator => msg.includes(indicator));
   }
 
   /**
    * Extract failed selector from test file and error message
    */
-  private extractFailedSelector(testFile: string, error: string): string | undefined {
+  private extractFailedSelector(testFile: string, error: any): string | undefined {
     try {
-      const testPath = path.join(this.testFilesPath, testFile);
-      const content = fs.readFileSync(testPath, 'utf-8');
+      const message = typeof error === 'string' ? error : (error?.message || JSON.stringify(error));
+      // TASK 1: Use scriptExecutor to resolve path (single source of truth)
+      const testPath = scriptExecutor.resolveGeneratedScriptPath(testFile);
+      // TASK 2: Log actual file path before reading
+      logger.info(`ACTUAL FILE PATH: ${testPath}`);
+      logger.info(`FILE EXISTS: ${fs.existsSync(testPath)}`);
+      
+      let content = '';
+      if (!fs.existsSync(testPath)) {
+        // TASK 3: Don't depend on file read - try to use error message instead
+        logger.warn(`File not found at ${testPath}; using error message for selector extraction`);
+        // Continue without file content - selector extraction from error will proceed
+      } else {
+        content = fs.readFileSync(testPath, 'utf-8');
+      }
 
       // Try to extract selector from error message
-      const selectorMatch = error.match(/(?:locator|selector)[\s:=]*['""`]([^'""`]+)['""`]/i);
+      const selectorMatch = String(message).match(/(?:locator|selector)[\s:=]*['"`]{0,1}([^'"`]+)['"`]{0,1}/i);
       if (selectorMatch) {
         return selectorMatch[1];
       }
 
       // If error mentions specific text, search for it in the test
-      const textMatch = error.match(/text[\s:=]*['""`]([^'""`]+)['""`]/i);
+      const textMatch = String(message).match(/text[\s:=]*['"`]{0,1}([^'"`]+)['"`]{0,1}/i);
       if (textMatch) {
         const text = textMatch[1];
         // Try to find selector in test that contains this text

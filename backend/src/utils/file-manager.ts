@@ -10,10 +10,9 @@ import { logger } from './logger';
 import { FileMetadata } from '../types';
 import { CodeValidator } from './code-validator';
 
-// Path to generated tests in pw-ai-agents/tests/ui/generated
+// Path to generated tests in pw-ai-agents/tests/ui/generated (resolved from repository root)
 const GENERATED_TESTS_DIR = path.join(
   process.cwd(),
-  '..',
   'pw-ai-agents',
   'tests',
   'ui',
@@ -183,11 +182,12 @@ export class FileManager {
       throw new Error(`Cannot save invalid Playwright test: ${finalValidation.errors.join('; ')}`);
     }
 
-    // ===== LOG STAGE 6: BEFORE FILE WRITE =====
+    // ===== LOG STAGE 6: BEFORE FILE WRITE - LOG COMPLETE GENERATED SCRIPT =====
     logger.debug(`[STAGE 6 - BEFORE WRITE] File path: ${filePath}`);
     logger.debug(`[STAGE 6 - BEFORE WRITE] Code length: ${cleanCode.length} chars`);
-    logger.debug(`[STAGE 6 - BEFORE WRITE] Code preview (first 100 chars):`);
-    logger.debug(`[STAGE 6 - BEFORE WRITE] ${cleanCode.substring(0, 100)}`);
+    logger.info(`\n📝 [STAGE 6 - COMPLETE GENERATED SCRIPT] START\n${'='.repeat(80)}`);
+    logger.info(cleanCode);
+    logger.info(`${'='.repeat(80)}\n📝 [STAGE 6 - COMPLETE GENERATED SCRIPT] END\n`);
 
     fs.writeFileSync(filePath, cleanCode, 'utf-8');
     logger.success(`Test script saved (overwritten if existed)`, actualFileName);

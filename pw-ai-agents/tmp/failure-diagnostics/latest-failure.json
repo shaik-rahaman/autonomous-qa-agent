@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-06-02T14:33:28.330Z",
+  "actualPlaywrightError": "\u001b[1A\u001b[2K[chromium] › tests/ui/generated/scripts/temp-1780410093741-e0df9647.spec.ts:6:5 › Login to OrangeHRM and verify dashboard\nTest failed: locator.fill: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[name=\"asdfdpassword\"]')\u001b[22m\n\n    at \u001b[90m/Users/shaik/backup/NewJob/Courses/testleaf/GenAI_Tool_Developer/apps-developed-github/AITools/hackathon/Autonomous_QA_Agent/pw-ai-agents/\u001b[39mtests/ui/generated/scripts/temp-1780410093741-e0df9647.spec.ts:11:52 {\n  \u001b[32mSymbol",
+  "extractedSelector": "[name=\"asdfdpassword\"]",
+  "failureType": "ELEMENT_NOT_FOUND",
+  "confidence": "high",
+  "source": "error_message",
+  "step": "temp-1780410093741-e0df9647.spec.ts",
+  "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login"
+}

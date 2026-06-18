@@ -1,0 +1,50 @@
+graph TB
+    subgraph Agents["🤖 MULTI-AGENT SYSTEM - Agent Types & Responsibilities"]
+        
+        subgraph GenAgents["📝 GENERATION AGENTS"]
+            GA1["Test Generation Agent<br/>AgentExecutor<br/><br/>🎯 Responsibility:<br/>English/Gherkin → Playwright Code<br/>- Convert user stories to BDD<br/>- Generate type-safe selectors<br/>- Validate syntax before saving"]
+        end
+        
+        subgraph ExecAgents["⚙️ EXECUTION AGENTS"]
+            EA1["Test Executor Agent<br/>ExecutorService<br/><br/>🎯 Responsibility:<br/>Run tests and capture results<br/>- Launch Playwright CLI<br/>- Capture stdout/stderr<br/>- Parse HTML/JSON reports<br/>- Track execution timeline"]
+        end
+        
+        subgraph OrchestAgents["🤖 ORCHESTRATION AGENTS"]
+            OA1["LangChain Orchestrator<br/>with Groq LLM<br/><br/>🎯 Responsibility:<br/>AI-based test management<br/>- Decide: Run vs Heal vs Retry<br/>- Use structured tools<br/>- Manage execution flow<br/>- Handle failures intelligently"]
+        end
+        
+        subgraph HealingAgents["🏥 SELF-HEALING AGENTS"]
+            HA1["Failure Detector<br/><br/>🎯 Detects:<br/>✓ Selector not found<br/>✓ Timeout errors<br/>✓ Navigation failures<br/>✓ Assertion mismatches"]
+            
+            HA2["Failure Analyzer<br/><br/>🎯 Analyzes:<br/>✓ Root cause of failure<br/>✓ Affected elements<br/>✓ Error categories<br/>✓ Fix strategies"]
+            
+            HA3["Fix Recommender<br/><br/>🎯 Recommends:<br/>✓ Alternative selectors<br/>✓ Wait adjustments<br/>✓ Element recovery<br/>✓ AI-powered fixes"]
+            
+            HA4["Healing Executor<br/><br/>🎯 Executes:<br/>✓ Apply healed selector<br/>✓ Validate changes<br/>✓ Retry test<br/>✓ Cache results"]
+        end
+        
+        subgraph IntegrationAgents["🔗 INTEGRATION AGENTS"]
+            IA1["Jira Connector<br/>jira-routes.ts<br/><br/>🎯 Responsibility:<br/>- Fetch issues from Jira<br/>- Extract test scenarios<br/>- Link results back"]
+            
+            IA2["MCP Client<br/>Model Context Protocol<br/><br/>🎯 Responsibility:<br/>- Query browser DOM<br/>- Get page structure<br/>- Suggest alternatives<br/>- Real-time analysis"]
+            
+            IA3["LLM Client<br/>Groq Integration<br/><br/>🎯 Responsibility:<br/>- AI decision making<br/>- Selector recommendations<br/>- Error interpretation<br/>- Test optimization"]
+        end
+    end
+    
+    subgraph Coordination["🔄 COORDINATION & DATA FLOW"]
+        AC["Agent Communication<br/><br/>✓ Orchestrator directs all agents<br/>✓ Shared data store<br/>✓ Tool-based interaction<br/>✓ Result aggregation"]
+        
+        DS["🗄️ Shared Data Store<br/><br/>- Test files<br/>- Execution results<br/>- Healed selectors<br/>- Execution timeline"]
+    end
+    
+    GenAgents -.->|Generates tests| DS
+    ExecAgents -.->|Stores results| DS
+    OrchestAgents -.->|Controls flow| ExecAgents
+    OrchestAgents -.->|Triggers healing| HealingAgents
+    HealingAgents -.->|Saves fixes| DS
+    HealingAgents -.->|Queries| IA2
+    HealingAgents -.->|Asks AI| IA3
+    IntegrationAgents -.->|Provides data| GenAgents
+    AC -.->|Coordinates| OrchestAgents
+    DS -.->|Feeds| Coordination

@@ -5,6 +5,7 @@
 import { logger } from '../utils/logger';
 import { LLMResponse, ToolCall, DOMResponse } from '../types';
 import Groq from 'groq-sdk';
+import { postProcessGeneratedCode, validateGeneratedCode } from './code-post-processor';
 
 const client = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -64,10 +65,17 @@ Do NOT add any other text.
 2. USE ASYNC/AWAIT: "async ({ page }) => { await page..." - do NOT use .then()
 3. USE MODERN METHODS: page.getByRole(), page.locator(), page.getByText() - NEVER deprecated click()/fill()
 4. CHAIN METHODS: await page.locator("#id").fill("value").click() chained
-5. WAIT FOR LOAD: Use await page.waitForLoadState("load") after goto
+5. WAIT FOR LOAD: Use await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 }); then await page.waitForLoadState("networkidle");
 6. VERIFY WITH EXPECT: await expect(element).toBeVisible() - NEVER check URLs
 7. USE TRY/CATCH: Wrap in try/catch for error handling
 8. EVERY STATEMENT MUST END WITH SEMICOLON
+
+!!!WAIT FOR LOAD!!!
+CRITICAL - Use EXACTLY this pattern after page.goto():
+- await page.goto("URL", { waitUntil: "domcontentloaded", timeout: 60000 });
+- await page.waitForLoadState("networkidle");
+- NEVER use waitUntil: "load" - it causes 30s timeouts on SPA frameworks
+- NEVER use only page.waitForLoadState("load") - it's unreliable
 
 !!!EXTRACTION FROM TEST STEPS!!!
 - Usernames/passwords: Extract exact values in quotes
@@ -79,8 +87,44 @@ Do NOT add any other text.
 !!!SELECTOR STRATEGIES!!!
 For input fields: #username, [name="username"], [type="text"], [placeholder="Username"]
 For buttons: button:has-text("Login"), [role="button"], getByRole("button", { name: /login/i })
-For links: a:has-text("CRM"), [role="link"], getByRole("link", { name: /crm/i })
-For text: page.getByText(/exact text/i)
+For links: a:has-text("Home"), [role="link"], getByRole("link", { name: /home/i })
+For headings/text: Prefer role-based selectors over text-based:
+  - Headings: page.getByRole("heading", { name: /heading text/i })
+  - Main content: page.getByRole("main")
+  - Dialog: page.getByRole("dialog")
+
+!!!LOCATOR PRIORITY (ENFORCE THIS STRICTLY)!!!
+ALWAYS choose locators in this order. NEVER skip a higher priority for lower:
+1. getByRole() - BEST: semantic, accessible, works with strict mode
+   Examples: page.getByRole("button", { name: /login/i })
+             page.getByRole("heading", { name: /page heading/i })
+             page.getByRole("link", { name: /click here/i })
+2. getByLabel() - Good for labeled inputs
+3. getByPlaceholder() - For inputs with placeholder text
+4. getByTestId() - When test IDs available
+5. locator() with CSS - When others don't work
+6. getByText() - LAST RESORT ONLY for non-interactive text like descriptions
+
+!!!CRITICAL - NEVER USE getByText() WHEN getByRole() EXISTS!!!
+When a page element exists in multiple forms:
+- getByRole('link', { name: 'Element text' })
+- getByRole('heading', { name: 'Element text' })
+- getByText(/Element text/i)
+
+ALWAYS choose: page.getByRole() with appropriate role
+
+NEVER choose: getByText() when role-based alternatives exist
+
+WHY: Playwright strict mode REJECTS getByText() when multiple elements match. 
+Role-based selectors are more semantic and specific.
+
+!!!GENERIC VALIDATION PATTERN (COPY EXACTLY)!!!
+After performing an action:
+await page.waitForURL(/expected-url/i);
+await page.waitForLoadState("networkidle");
+await expect(page.getByRole("heading", { name: /expected heading/i })).toBeVisible({ timeout: 10000 });
+
+This pattern works for ANY element type, not just OrangeHRM Dashboard.
 
 !!!CRITICAL - NO METHOD CHAINING ACROSS LINES!!!
 DO NOT split method chains across multiple lines.
@@ -108,14 +152,35 @@ import { test, expect } from "@playwright/test";
 
 test("Login to leaftap and verify success", async ({ page }) => {
   try {
-    await page.goto("http://leaftaps.com/opentaps/control/main");
-    await page.waitForLoadState("load");
+    await page.goto("http://leaftaps.com/opentaps/control/main", { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForLoadState("networkidle");
     
     await page.locator("#username").fill("demosalesmanager");
     await page.locator("#password").fill("crmsfa");
     await page.getByRole("button", { name: /login/i }).click();
     
-    await expect(page.getByRole("link", { name: /CRM/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /CRM/i })).toBeVisible({ timeout: 10000 });
+  } catch (error) {
+    console.error("Test failed:", error);
+    throw error;
+  }
+});
+
+!!!EXAMPLE FOR ORANGEHRM (DASHBOARD LOGIN)!!!
+import { test, expect } from "@playwright/test";
+
+test("Login to OrangeHRM and verify dashboard", async ({ page }) => {
+  try {
+    await page.goto("https://opensource-demo.orangehrmlive.com/web/index.php/auth/login", { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForLoadState("networkidle");
+    
+    await page.locator("[name=\"username\"]").fill("Admin");
+    await page.locator("[name=\"password\"]").fill("admin123");
+    await page.locator(".oxd-button--main").click();
+    
+    await page.waitForURL(/dashboard/i);
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
   } catch (error) {
     console.error("Test failed:", error);
     throw error;
@@ -183,8 +248,27 @@ INSTRUCTIONS:
       logger.debug('LLM generated code:', responseText.substring(0, 200));
       logger.success('✓ LLM: Test code generation successful');
 
+      // POST-PROCESS: Apply safety fixes to ensure strong selectors
+      const postProcessResult = postProcessGeneratedCode(responseText);
+      if (postProcessResult.modified) {
+        logger.info(`🔧 Code Post-Processing Applied:`);
+        postProcessResult.fixes.forEach(fix => logger.info(`   ✓ ${fix}`));
+      }
+
+      // VALIDATE: Check for any remaining weak selector issues
+      const validation = validateGeneratedCode(postProcessResult.code);
+      if (!validation.valid) {
+        validation.errors.forEach(error => {
+          if (error.includes('CRITICAL')) {
+            logger.error(`   ${error}`);
+          } else {
+            logger.warn(`   ${error}`);
+          }
+        });
+      }
+
       return {
-        message: responseText,
+        message: postProcessResult.code,
         toolCalls: [],
         stop: true, // Stop iteration - we have the code
       };
@@ -274,8 +358,27 @@ GENERATE PLAYWRIGHT TEST CODE NOW (PURE CODE ONLY, NO MARKDOWN, NO EXPLANATIONS)
       logger.debug('LLM generated code with real DOM:', responseText.substring(0, 200));
       logger.success('✓ LLM: Test code generation with real DOM elements successful');
 
+      // POST-PROCESS: Apply safety fixes to ensure strong selectors (especially with DOM data)
+      const postProcessResult = postProcessGeneratedCode(responseText);
+      if (postProcessResult.modified) {
+        logger.info(`🔧 Code Post-Processing Applied (with DOM data):`);
+        postProcessResult.fixes.forEach(fix => logger.info(`   ✓ ${fix}`));
+      }
+
+      // VALIDATE: Check for any remaining weak selector issues
+      const validation = validateGeneratedCode(postProcessResult.code);
+      if (!validation.valid) {
+        validation.errors.forEach(error => {
+          if (error.includes('CRITICAL')) {
+            logger.error(`   ${error}`);
+          } else {
+            logger.warn(`   ${error}`);
+          }
+        });
+      }
+
       return {
-        message: responseText,
+        message: postProcessResult.code,
         toolCalls: [],
         stop: true,
       };

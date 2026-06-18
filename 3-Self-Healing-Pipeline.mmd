@@ -1,0 +1,39 @@
+graph LR
+    subgraph SelfHealingPipeline["🏥 Self-Healing Agent Pipeline"]
+        direction LR
+        
+        Input["❌ Test Failure<br/>Error Message"]
+        
+        Detector["🔎 Failure Detector<br/>src/agents/self-healing/detector.ts<br/><br/>✓ Parse error logs<br/>✓ Extract selector<br/>✓ Categorize failure type"]
+        
+        Analyzer["📊 Failure Analyzer<br/>src/agents/self-healing/analyzer.ts<br/><br/>✓ Determine root cause<br/>✓ Identify affected elements<br/>✓ Suggest fix strategies"]
+        
+        MCP["🔗 MCP Client<br/>Model Context Protocol<br/><br/>✓ Query real DOM<br/>✓ Capture page structure<br/>✓ Find alternatives"]
+        
+        Recommender["💡 Fix Recommender<br/>src/agents/self-healing/recommender.ts<br/><br/>✓ AI analysis with Groq LLM<br/>✓ Rate candidate selectors<br/>✓ Rank by confidence"]
+        
+        Executor["🏁 Healing Executor<br/>src/agents/self-healing/executor.ts<br/><br/>✓ Apply healed selector<br/>✓ Validate syntax<br/>✓ Retry test"]
+        
+        Cache["💾 Selector Store<br/>backend/data/selector-store.json<br/><br/>✓ Store successful healings<br/>✓ Reuse for similar failures"]
+        
+        Output["✅ Healed Test"]
+    end
+    
+    Input -->|Failure details| Detector
+    Detector -->|Extracted data| Analyzer
+    Analyzer -->|Analysis result| MCP
+    MCP -->|DOM insights| Recommender
+    Recommender -->|Suggested selectors| Executor
+    Executor -->|Success| Cache
+    Cache -->|Cached fix| Executor
+    Executor -->|Healed code| Output
+    
+    style SelfHealingPipeline fill:#f3e8ff,stroke:#7c3aed,stroke-width:3px
+    style Input fill:#fee2e2,stroke:#dc2626
+    style Detector fill:#dbeafe,stroke:#0284c7
+    style Analyzer fill:#e0e7ff,stroke:#4338ca
+    style MCP fill:#cffafe,stroke:#0891b2
+    style Recommender fill:#fef3c7,stroke:#d97706
+    style Executor fill:#dcfce7,stroke:#16a34a
+    style Cache fill:#f0f9ff,stroke:#0369a1
+    style Output fill:#d1fae5,stroke:#059669

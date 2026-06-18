@@ -11,11 +11,15 @@ import { LogsViewer } from '@/components/LogsViewer';
 import { JiraIntegration } from '@/components/JiraIntegration';
 import { TestStatusSummary } from '@/components/TestStatusSummary';
 import { TestReportHeader } from '@/components/TestReportHeader';
+import { ExecuteScriptPanel } from '@/components/ExecuteScriptPanel';
+import { SelfHealingLab } from '@/components/SelfHealingLab';
 
 type TabType = 'logs' | 'report';
+type FeatureType = 'jira' | 'execute-script' | 'healing-lab';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('logs');
+  const [activeFeature, setActiveFeature] = useState<FeatureType>('jira');
   const [pollInterval, setPollInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
   const {
@@ -278,6 +282,29 @@ export default function App() {
           </div>
         </div>
 
+        {/* Feature Selector Menu */}
+        <div className="flex items-center gap-3">
+          {(['jira', 'execute-script', 'healing-lab'] as const).map((feature) => (
+            <button
+              key={feature}
+              onClick={() => {
+                setActiveFeature(feature);
+                setActiveTab('logs');
+              }}
+              className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200 ${
+                activeFeature === feature
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+              title={`Switch to ${feature === 'jira' ? 'Jira Integration' : feature === 'execute-script' ? 'Execute Existing Script' : 'Self-Healing Lab'}`}
+            >
+              {feature === 'jira' && '🔗 Jira Integration'}
+              {feature === 'execute-script' && '▶️ Execute Script'}
+              {feature === 'healing-lab' && '🧪 Healing Lab'}
+            </button>
+          ))}
+        </div>
+
         {/* Status Indicators */}
         <div className="flex items-center gap-3">
           <JiraConnectionStatus />
@@ -287,103 +314,152 @@ export default function App() {
 
       {/* Main Content Area - 3-Column Layout */}
       <div className="flex-1 flex overflow-hidden gap-4 p-6" style={{ backgroundColor: '#111827' }}>
-        {/* LEFT COLUMN: Inputs & Integration - Hidden in Report tab but stays in layout */}
+        {/* LEFT COLUMN: Feature-Specific Controls */}
         <div className={`w-96 flex flex-col gap-5 overflow-y-auto pr-3 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent ${activeTab === 'report' ? 'hidden' : ''}`}>
-          {/* Jira Integration Card */}
-          <div className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 rounded-2xl shadow-md border-2 border-purple-500/40 p-5 flex-shrink-0 min-h-0">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-6 h-6 rounded-lg bg-purple-600/30 flex items-center justify-center text-purple-300 text-lg font-bold flex-shrink-0">🔗</div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-base font-bold text-white tracking-wide break-words">Jira Integration</h2>
-                <p className="text-xs text-purple-300/60 font-medium mt-0.5 break-words">Fetch & transform issues</p>
-              </div>
-            </div>
-            <div className="border-t border-purple-500/30 pt-4 overflow-hidden">
-              <JiraIntegration />
-            </div>
-          </div>
-
-          {/* Test Input Card */}
-          <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 p-5 flex-shrink-0">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-5 h-5 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">📝</div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-base font-bold text-white break-words">Test Input</h2>
-                <p className="text-xs text-gray-400 font-medium mt-0.5 break-words">Define test steps & URL</p>
-              </div>
-            </div>
-            <TestCaseInput onGenerate={handleGenerateTest} isLoading={isLoading} />
-          </div>
-
-          {/* Execution Control Card */}
-          <div className="bg-gradient-to-br from-green-900/40 to-green-800/20 rounded-2xl shadow-md border-2 border-green-500/40 p-5 flex-shrink-0">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-lg bg-green-600/30 flex items-center justify-center text-green-300 text-lg flex-shrink-0">▶️</div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-base font-bold text-white break-words">Execute Test</h2>
-                <p className="text-xs text-green-300/60 font-medium mt-0.5 break-words">Run & monitor execution</p>
-              </div>
-            </div>
-            <div className="border-t border-green-500/30 pt-4">
-              <ExecutionPanel
-                onExecute={handleExecuteTest}
-                onRetry={handleRetryTest}
-                isLoading={isLoading}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* CENTER COLUMN: Code Editor Panel - Hidden in Report tab but stays in layout */}
-        <div className={`flex-1 flex flex-col gap-6 min-w-0 ${activeTab === 'report' ? 'hidden' : ''}`}>
-          {/* Code Panel Header */}
-          <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 overflow-hidden flex flex-col flex-1 min-h-0">
-            {/* Panel Title */}
-            <div className="bg-gray-900/80 border-b border-gray-700 px-6 py-3 flex-shrink-0">
-              <h2 className="text-sm font-bold text-white">Code</h2>
-            </div>
-            {/* Script Editor with Tabs */}
-            <ScriptEditor isLoading={isLoading} />
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: Logs & Report - Always visible, fixed width container */}
-        <div className="w-96 flex-shrink-0 flex flex-col gap-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent pl-3 max-w-96 min-w-96">
-          {/* Tabs Navigation */}
-          <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 overflow-hidden flex-shrink-0 w-96">
-            <div className="flex gap-2 p-2 bg-gray-900/50">
-              {(['logs', 'report'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab as TabType)}
-                  className={`flex-1 px-3 py-2.5 text-sm font-bold rounded-lg transition-all duration-200 whitespace-nowrap text-center ${
-                    activeTab === tab
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'bg-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800'
-                  }`}
-                  title={`View ${tab}`}
-                >
-                  {activeTab === tab && <span className="mr-1">●</span>}
-                  {tab === 'logs' && '📋 Logs'}
-                  {tab === 'report' && '📊 Report'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Content Display - Only content changes, not the container */}
-          <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 overflow-hidden flex flex-col flex-1 min-h-0 w-full">
-            <div className="flex flex-col flex-1 min-h-0 overflow-y-auto w-full">
-              {activeTab === 'logs' && <LogsViewer isLoading={isLoading} />}
-              {activeTab === 'report' && (
-                <div className="flex flex-col w-full h-full overflow-hidden">
-                  <TestStatusSummary isLoading={isLoading} />
-                  <TestReportHeader isLoading={isLoading} />
+          {/* Show Jira Integration controls only for Jira feature */}
+          {activeFeature === 'jira' && (
+            <>
+              {/* Jira Integration Card */}
+              <div className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 rounded-2xl shadow-md border-2 border-purple-500/40 p-5 flex-shrink-0 min-h-0">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-6 h-6 rounded-lg bg-purple-600/30 flex items-center justify-center text-purple-300 text-lg font-bold flex-shrink-0">🔗</div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-bold text-white tracking-wide break-words">Jira Integration</h2>
+                    <p className="text-xs text-purple-300/60 font-medium mt-0.5 break-words">Fetch & transform issues</p>
+                  </div>
                 </div>
-              )}
+                <div className="border-t border-purple-500/30 pt-4 overflow-hidden">
+                  <JiraIntegration />
+                </div>
+              </div>
+
+              {/* Test Input Card */}
+              <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 p-5 flex-shrink-0">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="w-5 h-5 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">📝</div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-bold text-white break-words">Test Input</h2>
+                    <p className="text-xs text-gray-400 font-medium mt-0.5 break-words">Define test steps & URL</p>
+                  </div>
+                </div>
+                <TestCaseInput onGenerate={handleGenerateTest} isLoading={isLoading} />
+              </div>
+
+              {/* Execution Control Card */}
+              <div className="bg-gradient-to-br from-green-900/40 to-green-800/20 rounded-2xl shadow-md border-2 border-green-500/40 p-5 flex-shrink-0">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 rounded-lg bg-green-600/30 flex items-center justify-center text-green-300 text-lg flex-shrink-0">▶️</div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-bold text-white break-words">Execute Test</h2>
+                    <p className="text-xs text-green-300/60 font-medium mt-0.5 break-words">Run & monitor execution</p>
+                  </div>
+                </div>
+                <div className="border-t border-green-500/30 pt-4">
+                  <ExecutionPanel
+                    onExecute={handleExecuteTest}
+                    onRetry={handleRetryTest}
+                    isLoading={isLoading}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Show Execute Script panel for execute-script feature */}
+          {activeFeature === 'execute-script' && (
+            <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 p-5 flex-shrink-0">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-5 h-5 rounded-lg bg-green-600/20 flex items-center justify-center text-green-400">▶️</div>
+                <h2 className="text-base font-bold text-white">Execute Existing Script</h2>
+              </div>
+              {/* Mini info message */}
+              <p className="text-xs text-gray-400 mb-4">Paste any Playwright script and execute it with self-healing support</p>
+            </div>
+          )}
+
+          {/* Show Healing Lab info for healing-lab feature */}
+          {activeFeature === 'healing-lab' && (
+            <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 p-5 flex-shrink-0">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-5 h-5 rounded-lg bg-purple-600/20 flex items-center justify-center text-purple-400">🧪</div>
+                <h2 className="text-base font-bold text-white">Self-Healing Lab</h2>
+              </div>
+              <p className="text-xs text-gray-400 mb-4">Test and debug self-healing capabilities by injecting intentional failures</p>
+              <div className="space-y-2 text-xs text-gray-500">
+                <p>✓ Strict Mode violations</p>
+                <p>✓ Element Not Found errors</p>
+                <p>✓ Timeout issues</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* CENTER COLUMN: Feature-Specific Content Panel */}
+        <div className={`flex-1 flex flex-col gap-6 min-w-0 ${activeTab === 'report' ? 'hidden' : ''}`}>
+          {/* Jira Feature: Show Script Editor */}
+          {activeFeature === 'jira' && (
+            <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="bg-gray-900/80 border-b border-gray-700 px-6 py-3 flex-shrink-0">
+                <h2 className="text-sm font-bold text-white">Code</h2>
+              </div>
+              <ScriptEditor isLoading={isLoading} />
+            </div>
+          )}
+
+          {/* Execute Script Feature: Show Execute Script Panel */}
+          {activeFeature === 'execute-script' && (
+            <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 overflow-hidden flex flex-col flex-1 min-h-0 p-6">
+              <ExecuteScriptPanel />
+            </div>
+          )}
+
+          {/* Healing Lab Feature: Show Healing Lab Panel */}
+          {activeFeature === 'healing-lab' && (
+            <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 overflow-hidden flex flex-col flex-1 min-h-0 p-6">
+              <SelfHealingLab />
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT COLUMN: Results & Status - Show for Jira feature */}
+        {activeFeature === 'jira' && (
+          <div className="w-96 flex-shrink-0 flex flex-col gap-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent pl-3 max-w-96 min-w-96">
+            {/* Tabs Navigation */}
+            <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 overflow-hidden flex-shrink-0 w-96">
+              <div className="flex gap-2 p-2 bg-gray-900/50">
+                {(['logs', 'report'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab as TabType)}
+                    className={`flex-1 px-3 py-2.5 text-sm font-bold rounded-lg transition-all duration-200 whitespace-nowrap text-center ${
+                      activeTab === tab
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'bg-transparent text-gray-400 hover:text-gray-300 hover:bg-gray-800'
+                    }`}
+                    title={`View ${tab}`}
+                  >
+                    {activeTab === tab && <span className="mr-1">●</span>}
+                    {tab === 'logs' && '📋 Logs'}
+                    {tab === 'report' && '📊 Report'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Content Display */}
+            <div className="bg-gray-800 rounded-2xl shadow-md border border-gray-700 overflow-hidden flex flex-col flex-1 min-h-0 w-full">
+              <div className="flex flex-col flex-1 min-h-0 overflow-y-auto w-full">
+                {activeTab === 'logs' && <LogsViewer isLoading={isLoading} />}
+                {activeTab === 'report' && (
+                  <div className="flex flex-col w-full h-full overflow-hidden">
+                    <TestStatusSummary isLoading={isLoading} />
+                    <TestReportHeader isLoading={isLoading} />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Error Bar */}

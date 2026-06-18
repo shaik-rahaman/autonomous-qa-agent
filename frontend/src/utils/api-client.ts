@@ -120,4 +120,18 @@ export const apiService = {
       throw handleError(error as AxiosError);
     }
   },
+
+  /**
+   * Generic POST method for any endpoint
+   */
+  async post<T>(path: string, data: unknown): Promise<T> {
+    try {
+      const response = await apiClient.post<T>(path, data, {
+        timeout: 120000, // Extended timeout for long-running operations
+      });
+      return response.data;
+    } catch (error) {
+      throw handleError(error as AxiosError);
+    }
+  },
 };

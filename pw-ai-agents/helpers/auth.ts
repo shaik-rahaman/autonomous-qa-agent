@@ -12,7 +12,7 @@ export async function login(page: Page, credentials: Credentials): Promise<void>
   await page.fill('input[name="USERNAME"]', credentials.username);
   await page.fill('input[name="PASSWORD"]', credentials.password);
   await page.click('input[type="submit"]');
-  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
 }
 
 /**
@@ -20,7 +20,7 @@ export async function login(page: Page, credentials: Credentials): Promise<void>
  */
 export async function logout(page: Page): Promise<void> {
   await page.goto('http://leaftaps.com/opentaps/control/logout');
-  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
 }
 
 /**

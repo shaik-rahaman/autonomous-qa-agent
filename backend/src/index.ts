@@ -42,7 +42,8 @@ app.get('/report/:id', (req, res) => {
     const execution = executorService.getExecution(id);
 
     // Serve the Playwright HTML report from pw-ai-agents/playwright-report/index.html
-    const reportPath = path.join(process.cwd(), 'pw-ai-agents', 'playwright-report', 'index.html');
+    // Use the resolved repo root from executorService so we don't rely on process.cwd()
+    const reportPath = path.join(executorService.getRepoRoot(), 'pw-ai-agents', 'playwright-report', 'index.html');
     
     if (execution && fs.existsSync(reportPath)) {
       logger.debug(`Serving Playwright report from: ${reportPath}`);
@@ -277,6 +278,14 @@ app.listen(PORT, () => {
   logger.info('  GET  /api/execution/:id/logs - Get execution logs');
   logger.info('  GET  /api/executions    - List recent executions');
 });
+
+// If HEALING_ENABLED is explicitly set to 'false' at startup, abort to avoid
+// running in a misconfigured release state. This enforces the critical release
+// policy that healing must be explicitly enabled or left unset for dev/testing.
+if (process.env.HEALING_ENABLED === 'false') {
+  logger.error('HEALING_ENABLED explicitly set to false - aborting startup per release policy');
+  process.exit(1);
+}
 
 export default app;
 

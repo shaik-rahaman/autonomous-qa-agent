@@ -10,7 +10,7 @@ import type { Page, TestInfo } from '@playwright/test';
  */
 export async function navigateTo(page: Page, url: string): Promise<void> {
   await page.goto(url);
-  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
 }
 
 /**
@@ -49,8 +49,7 @@ export async function login(
   
   const submitButton = page.locator('button[type="submit"]');
   await submitButton.click();
-  
-  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
 }
 
 /**
@@ -85,5 +84,5 @@ export async function getElementText(page: Page, selector: string): Promise<stri
  */
 export async function clickAndWait(page: Page, selector: string): Promise<void> {
   await page.locator(selector).click();
-  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
 }

@@ -53,7 +53,8 @@ export class FailureDetector {
    * Detect failure pattern from test error
    */
   detectFailurePattern(failure: TestFailure): FailurePattern {
-    const errorText = `${failure.error} ${failure.stackTrace}`.toLowerCase();
+    const raw = `${typeof failure.error === 'string' ? failure.error : ((failure.error as any) && (failure.error as any).message) ? (failure.error as any).message : JSON.stringify(failure.error || '')} ${failure.stackTrace || ''}`;
+    const errorText = String(raw).toLowerCase();
 
     for (const [patternType, keywords] of Object.entries(this.failurePatterns)) {
       const matches = keywords.filter(keyword => errorText.includes(keyword.toLowerCase()));
@@ -77,8 +78,9 @@ export class FailureDetector {
    * Check if error is a common known issue
    */
   isKnownIssue(error: string): boolean {
+    const msg = typeof error === 'string' ? error.toLowerCase() : ((error as any) && ((error as any).message || '') ? String((error as any).message).toLowerCase() : String(error || '').toLowerCase());
     return Object.values(this.failurePatterns)
       .flat()
-      .some(keyword => error.toLowerCase().includes(keyword));
+      .some(keyword => msg.includes(keyword));
   }
 }
