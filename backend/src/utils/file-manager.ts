@@ -8,18 +8,13 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from './logger';
 import { FileMetadata } from '../types';
+import { resolvePwAiAgentsGeneratedDir } from './repo-utils';
 import { CodeValidator } from './code-validator';
 
-// Path to generated tests in pw-ai-agents/tests/ui/generated (resolved from repository root)
-const GENERATED_TESTS_DIR = path.join(
-  process.cwd(),
-  'pw-ai-agents',
-  'tests',
-  'ui',
-  'generated'
-);
+// Path to generated tests in pw-ai-agents/tests/ui/generated (canonical repo-resolved path)
+const GENERATED_TESTS_DIR = resolvePwAiAgentsGeneratedDir(__dirname);
 
-// Subdirectories for organized file storage
+// Subdirectories for organized file storage (scripts subfolder is canonical for Playwright)
 const GHERKIN_DIR = path.join(GENERATED_TESTS_DIR, 'gherkin');
 const SCRIPTS_DIR = path.join(GENERATED_TESTS_DIR, 'scripts');
 
@@ -188,6 +183,10 @@ export class FileManager {
     logger.info(`\n📝 [STAGE 6 - COMPLETE GENERATED SCRIPT] START\n${'='.repeat(80)}`);
     logger.info(cleanCode);
     logger.info(`${'='.repeat(80)}\n📝 [STAGE 6 - COMPLETE GENERATED SCRIPT] END\n`);
+
+    // PATH DEBUG: show computed script directory and exact save path
+    logger.info(`[PATH DEBUG] Scripts directory: ${SCRIPTS_DIR}`);
+    logger.info(`[PATH DEBUG] Script save path: ${filePath}`);
 
     fs.writeFileSync(filePath, cleanCode, 'utf-8');
     logger.success(`Test script saved (overwritten if existed)`, actualFileName);

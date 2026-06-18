@@ -6,9 +6,11 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from './logger';
 import { FileMetadata } from '../types';
+import { resolvePwAiAgentsGeneratedDir } from '../../backend/src/utils/repo-utils';
 
-// Save generated tests into the repository tests folder so ExecutionService can run them
-const GENERATED_TESTS_DIR = path.join(process.cwd(), 'tests/ui/generated');
+// Save generated tests into the canonical repository `pw-ai-agents/tests/ui/generated`
+const GENERATED_TESTS_DIR = resolvePwAiAgentsGeneratedDir(__dirname);
+const SCRIPTS_DIR = path.join(GENERATED_TESTS_DIR, 'scripts');
 
 interface FileVersion {
   metadata: FileMetadata;
@@ -25,10 +27,10 @@ export class FileManager {
     testSteps: string,
     url: string
   ): FileMetadata {
-    // Ensure directory exists
-    if (!fs.existsSync(GENERATED_TESTS_DIR)) {
-      fs.mkdirSync(GENERATED_TESTS_DIR, { recursive: true });
-      logger.info('Created generated tests directory', GENERATED_TESTS_DIR);
+    // Ensure directory exists (and scripts subfolder)
+    if (!fs.existsSync(SCRIPTS_DIR)) {
+      fs.mkdirSync(SCRIPTS_DIR, { recursive: true });
+      logger.info('Created generated tests directory', SCRIPTS_DIR);
     }
 
     // Format code before saving
@@ -38,7 +40,11 @@ export class FileManager {
 
     // Ensure fileName ends with .spec.ts
     const finalFileName = fileName.endsWith('.spec.ts') ? fileName : `${fileName}.spec.ts`;
-    const filePath = path.join(GENERATED_TESTS_DIR, finalFileName);
+    const filePath = path.join(SCRIPTS_DIR, finalFileName);
+
+    // PATH DEBUG
+    logger.info(`[PATH DEBUG] Scripts directory: ${SCRIPTS_DIR}`);
+    logger.info(`[PATH DEBUG] Script save path: ${filePath}`);
 
     // Save file (overwrites if exists)
     fs.writeFileSync(filePath, formattedCode, 'utf-8');
