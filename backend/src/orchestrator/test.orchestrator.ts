@@ -14,6 +14,7 @@
 import fs from 'fs';
 import path from 'path';
 import { logger } from '../utils/logger';
+import { extractFailedLocator, isValidSelector } from '../agents/self-healing/error-parser';
 import { ExecutorService, ExecutionResult } from '../execution/executor-service';
 import { healFailure, HealFailureInput, HealFailureOutput } from '../agents/self-healing';
 import { saveSelectorFix, findSelectorFix } from '../self-healing/selector-store';
@@ -176,20 +177,36 @@ export class TestOrchestrator {
         content = fs.readFileSync(testPath, 'utf-8');
       }
 
-      // Try to extract selector from error message
-      const selectorMatch = String(message).match(/(?:locator|selector)[\s:=]*['"`]{0,1}([^'"`]+)['"`]{0,1}/i);
-      if (selectorMatch) {
+      // FIRST: Use canonical error-parser which prioritizes Playwright-reported selectors
+      try {
+        const parsed = extractFailedLocator(error, error);
+        if (parsed && isValidSelector(parsed)) {
+          logger.info(`FAILED_SELECTOR_SOURCE: error-parser`);
+          logger.info(`FAILED_SELECTOR_VALUE: ${parsed}`);
+          return parsed;
+        }
+      } catch (e) {
+        logger.debug(`error-parser threw while extracting selector: ${e}`);
+      }
+
+      // FALLBACK: Try to extract selector from error message using a stricter regex
+      const selectorMatch = String(message).match(/(?:params\.selector|locator|selector)\s*[=:]*\s*['"`]([^'"`]+)['"`]/i);
+      if (selectorMatch && selectorMatch[1] && isValidSelector(selectorMatch[1])) {
+        logger.info(`FAILED_SELECTOR_SOURCE: message-regex`);
+        logger.info(`FAILED_SELECTOR_VALUE: ${selectorMatch[1]}`);
         return selectorMatch[1];
       }
 
-      // If error mentions specific text, search for it in the test
+      // If error mentions specific text, search for it in the test (conservative)
       const textMatch = String(message).match(/text[\s:=]*['"`]{0,1}([^'"`]+)['"`]{0,1}/i);
       if (textMatch) {
         const text = textMatch[1];
         // Try to find selector in test that contains this text
-        const pattern = new RegExp(`getByText\\(['"]${text}['"]\\)|text=['"]${text}['"]`);
+        const pattern = new RegExp(`getByText\\(['\"]${text}['\"]\\)|text=['\"]${text}['\"]`);
         const match = content.match(pattern);
         if (match) {
+          logger.info(`FAILED_SELECTOR_SOURCE: file-getByText`);
+          logger.info(`FAILED_SELECTOR_VALUE: ${text}`);
           return text;
         }
       }

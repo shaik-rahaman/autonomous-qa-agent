@@ -23,6 +23,10 @@ export interface SelfHealingLabRequest {
 }
 
 export class ScriptExecutor {
+  // PHASE 2C OPTIMIZATION: In-memory cache for parsed scripts
+  private static scriptCache: Map<string, string> = new Map();
+  private static readonly MAX_CACHE_SIZE = 100; // Keep last 100 parsed scripts
+
   private tempScriptDir: string;
 
   constructor(projectRoot: string = '.') {
@@ -136,12 +140,23 @@ export class ScriptExecutor {
 
   /**
    * Prepare script for execution (fix imports, etc.)
+   * PHASE 2C OPTIMIZATION: Cache parsed scripts to avoid re-parsing
    */
   private prepareScript(script: string): string {
+    // PHASE 2C: Check cache first
+    const cacheKey = this.getScriptCacheKey(script);
+    if (ScriptExecutor.scriptCache.has(cacheKey)) {
+      const cached = ScriptExecutor.scriptCache.get(cacheKey)!;
+      logger.debug('[PHASE-2C-OPT] 🚀 Using cached prepared script');
+      return cached;
+    }
+
     let prepared = script;
 
-    // Normalize existing imports: if any import from '@playwright/test' exists, don't add duplicate
-    const hasPlaywrightImport = /from\s+['"]@playwright\/test['"]/m.test(prepared);
+    // Normalize existing imports: if any import or require from '@playwright/test' exists, don't add duplicate
+    // Also detect CommonJS `require('@playwright/test')` and destructured require like
+    // `const { test, expect } = require('@playwright/test')` to avoid mixing ESM import with CommonJS.
+    const hasPlaywrightImport = /from\s+['"]@playwright\/test['"]|require\(\s*['"]@playwright\/test['"]\s*\)|const\s+\{[^}]*test[^}]*\}\s*=\s*require\(\s*['"]@playwright\/test['"]\s*\)/m.test(prepared);
     if (!hasPlaywrightImport) {
       prepared = `import { test, expect } from '@playwright/test';\n\n${prepared}`;
     }
@@ -150,10 +165,11 @@ export class ScriptExecutor {
     const hasTestSetTimeout = /test\.setTimeout\s*\(/m.test(prepared);
     if (!hasTestSetTimeout) {
       // Insert test.setTimeout after the import block (or at file top)
+      // Use 30s overall test timeout so generated tests fail fast on missing elements
       if (/^(\s*(?:import[\s\S]*?;\s*\n)+)/.test(prepared)) {
-        prepared = prepared.replace(/^(\s*(?:import[\s\S]*?;\s*\n)+)/, `$1\n// Set default test timeout for generated scripts\ntest.setTimeout(120000);\n\n`);
+        prepared = prepared.replace(/^(\s*(?:import[\s\S]*?;\s*\n)+)/, `$1\n// Set default test timeout for generated scripts\ntest.setTimeout(30000);\n\n`);
       } else {
-        prepared = `// Set default test timeout for generated scripts\ntest.setTimeout(120000);\n\n${prepared}`;
+        prepared = `// Set default test timeout for generated scripts\ntest.setTimeout(30000);\n\n${prepared}`;
       }
     }
 
@@ -164,13 +180,74 @@ export class ScriptExecutor {
         // preserve original indentation
         const indentMatch = gotoStmt.match(/^(\s*)/);
         const indent = indentMatch ? indentMatch[1] : '';
-        return `${gotoStmt}\n${indent}await page.waitForLoadState("domcontentloaded", { timeout: 120000 });`;
+        return `${gotoStmt}\n${indent}await page.waitForLoadState("domcontentloaded", { timeout: 30000 });`;
       });
     } catch (e) {
       // on any regex failure, fall back silently to the original script
     }
 
+    // Replace patterns of: click -> sleep (waitForTimeout) -> expect heading
+    // with robust navigation handling: waitForURL + waitForLoadState + expect
+    try {
+      prepared = prepared.replace(/await\s+([\s\S]*?)\.click\(\)\s*;?\s*await\s+page\.waitForTimeout\(\s*\d+\s*\)\s*;?\s*await\s+expect\(\s*page\.getByRole\(\s*['\"]heading['\"],\s*\{\s*name:\s*['\"]([^'\"]+)['\"]\s*\}\s*\)\s*\)\.toBeVisible\(([^)]*)\)\s*;?/g, (match, clickTarget, headingName, expectArgs) => {
+        // Normalize heading to use case-insensitive regex
+        const heading = headingName.replace(/\//g, '').trim();
+        // Ensure regex-safe heading
+        const safeHeading = heading.replace(/([.*+?^${}()|[\]\\])/g, '\\$1');
+        const replacement = `${clickTarget}.click({ timeout: 5000 });\n    await page.waitForURL(/${safeHeading}/i, { timeout: 30000 });\n    await page.waitForLoadState('networkidle', { timeout: 30000 });\n    await expect(page.getByRole('heading', { name: /${safeHeading}/i })).toBeVisible(${expectArgs});`;
+        return replacement;
+      });
+    } catch (e) {
+      // ignore transformation errors - keep original script
+    }
+
+    // Apply fast action timeouts to locator actions so missing elements fail fast
+    try {
+      prepared = this.applyFastActionTimeouts(prepared);
+    } catch (e) {}
+
+    // PHASE 2C: Cache prepared script
+    if (ScriptExecutor.scriptCache.size >= ScriptExecutor.MAX_CACHE_SIZE) {
+      // Remove oldest entry when cache is full
+      const firstKey = ScriptExecutor.scriptCache.keys().next().value as string | undefined;
+      if (firstKey) {
+        ScriptExecutor.scriptCache.delete(firstKey);
+      }
+    }
+    ScriptExecutor.scriptCache.set(cacheKey, prepared);
+    logger.debug('[PHASE-2C-OPT] 📦 Cached prepared script');
+
     return prepared;
+  }
+
+  /**
+   * Generate cache key for script
+   */
+  private getScriptCacheKey(script: string): string {
+    // Use first 500 chars as cache key (cheaper than full hash)
+    return script.substring(0, 500);
+  }
+
+  /**
+   * Ensure locator actions use a short timeout so missing elements fail fast in healing lab
+   */
+  private applyFastActionTimeouts(script: string): string {
+    let out = script;
+    try {
+      // Add timeout to bare `.click()` and `.fill()` calls (only when no options object present)
+      out = out.replace(/(\.click)\(\s*\)/g, `.click({ timeout: 5000 })`);
+      // For fill: if there's already an options object, avoid duplication. If only one arg present, add options.
+      out = out.replace(/(\.fill)\(\s*([^,\)]*?)\s*\)/g, (m: string, p1: string, p2: string) => {
+        if (/\{\s*timeout\s*:\s*\d+/m.test(m)) return m;
+        // if second param is absent or not an options object, add options object
+        // keep existing value (e.g. .fill('value') -> .fill('value', { timeout: 5000 }) )
+        if (p2 && p2.trim().length > 0) return `${p1}(${p2}, { timeout: 5000 })`;
+        return `${p1}({ timeout: 5000 })`;
+      });
+    } catch (e) {
+      // noop on regex failures
+    }
+    return out;
   }
 
   /**
@@ -221,7 +298,7 @@ export class ScriptExecutor {
           // Only corrupt attribute selectors inside locator(...) or page.locator(...) calls
           modified = modified.replace(/(page\.locator\(|locator\()([`"'])(\[([^\]]+)\])\2/g, (m: string, p1: string, quote: string, sel: string) => {
             const replaced = sel.replace(/\[(\w+)=(["'])([^"']+)\2\]/g, (mm: string, attrName: string, q: string, attrValue: string) => {
-              return `[${attrName}="asdf${attrValue}"]`;
+              return `[${attrName}="corrupt${attrValue}"]`;
             });
             return `${p1}${quote}${replaced}${quote}`;
           });
@@ -231,7 +308,7 @@ export class ScriptExecutor {
           modified = modified.replace(
             /\[(\w+)=['\"]([^"']+)['\"]\]/g,
             (match, attrName, attrValue) => {
-              return `[${attrName}="asdf${attrValue}"]`;
+              return `[${attrName}="corrupt${attrValue}"]`;
             }
           );
           logger.info('✓ Injected ELEMENT_NOT_FOUND failure: Prefixed attribute values to make selectors invalid (generic)');
@@ -333,7 +410,7 @@ export class ScriptExecutor {
     logger.section('Script Executor: Execute Inline Script');
 
     // Prepare script first (inject imports, timeouts, waits)
-    const prepared = this.prepareScript(req.script);
+    let prepared = this.prepareScript(req.script);
 
     // Then validate the prepared script
     const validation = this.validateScript(prepared);
@@ -348,6 +425,11 @@ export class ScriptExecutor {
 
     // Generate temp file name
     const fileName = this.generateTempFileName();
+
+    // Ensure locator actions have short timeouts so healing lab fails fast on missing elements
+    try {
+      prepared = this.applyFastActionTimeouts(prepared);
+    } catch (e) {}
 
     // Save script
     const saveResult = this.saveTemporaryScript(prepared, fileName);
@@ -391,7 +473,7 @@ export class ScriptExecutor {
     try {
       prepared = prepared.replace(/(await\s+)?page\.goto\(([^)]+)\)\s*;?/g, (m, awaitTok, args) => {
         // Replace any existing timeout with 120000, or add it if missing
-        let modifiedArgs = String(args).replace(/timeout:\s*\d+/g, 'timeout: 120000');
+        let modifiedArgs = String(args).replace(/timeout:\s*\d+/g, 'timeout: 30000');
         if (!modifiedArgs.includes('timeout:')) {
           // No timeout present, need to add it to the options object
           // Check if args has options: e.g., { waitUntil: "domcontentloaded" }
@@ -404,7 +486,7 @@ export class ScriptExecutor {
             modifiedArgs = `${modifiedArgs}, { timeout: 120000 }`;
           }
         }
-        return `await page.goto(${modifiedArgs});\n  await page.waitForLoadState("domcontentloaded", { timeout: 120000 });`;
+        return `await page.goto(${modifiedArgs});\n  await page.waitForLoadState("domcontentloaded", { timeout: 30000 });`;
       });
     } catch (e) {
       logger.warn('Failed to inject waitForLoadState after page.goto', e instanceof Error ? e.message : String(e));
@@ -436,6 +518,7 @@ export class ScriptExecutor {
       prepared = prepared.replace(/(\b(?:page\.locator|locator)\()([`'"])([\s\S]*?)\2(\))/g, (full, prefix, quote, selector, close) => {
         // Determine if this locator occurs after the first goto
         const occurrenceIndex = prepared.indexOf(full);
+        const rawSelector = selector;
         let effectiveSelector = selector;
 
         // If we need to inject failure into first locator after goto
@@ -447,10 +530,36 @@ export class ScriptExecutor {
           injectedSelector = effectiveSelector;
           firstLocatorInjected = true;
         }
+        // Normalize selector: unescape any escaped quotes coming from JSON payloads
+        try {
+          const finalSelector = String(effectiveSelector).replace(/\\"/g, '"').replace(/\\'/g, "'").trim();
 
-        // Build instrumentation using comma operator to preserve original expression
-        const logged = `(console.log('[HEALING LAB] REACHED LOCATOR:', ${quote}${effectiveSelector}${quote}), ${prefix}${quote}${effectiveSelector}${quote}${close})`;
-        return logged;
+          // Logging: raw, escaped (if any), and final form
+          console.log('[HEALING LAB] RAW_SELECTOR:', rawSelector);
+          console.log('[HEALING LAB] ESCAPED_SELECTOR:', String(effectiveSelector));
+          console.log('[HEALING LAB] FINAL_SCRIPT_SELECTOR:', finalSelector);
+
+          // Validate that we do not have double-escaped selectors
+          if (finalSelector.includes('\\"')) {
+            throw new Error('Double escaped selector detected');
+          }
+
+          // Use finalSelector for instrumentation and set injectedSelector only if not already set.
+          // This prevents later locators from overwriting the selector we injected (the corrupted locator).
+          effectiveSelector = finalSelector;
+          if (!injectedSelector) injectedSelector = finalSelector;
+
+          // Safely serialize the selector so embedded quotes do not break the generated code
+          const serialized = JSON.stringify(finalSelector);
+          // Build instrumentation using comma operator to preserve original expression
+          const logged = `(console.log('[HEALING LAB] REACHED LOCATOR:', ${serialized}), ${prefix}${serialized}${close})`;
+          return logged;
+        } catch (e) {
+          logger.warn('Failed to normalize selector during instrumentation', e instanceof Error ? e.message : String(e));
+          const serialized = JSON.stringify(effectiveSelector);
+          const logged = `(console.log('[HEALING LAB] REACHED LOCATOR:', ${serialized}), ${prefix}${serialized}${close})`;
+          return logged;
+        }
       });
     } catch (e) {
       logger.warn('Failed to instrument locators', e instanceof Error ? e.message : String(e));

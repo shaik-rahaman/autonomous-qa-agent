@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from './logger';
 import { FileMetadata } from '../types';
-import { resolvePwAiAgentsGeneratedDir } from '../../backend/src/utils/repo-utils';
+import { resolvePwAiAgentsGeneratedDir } from './repo-utils';
 
 // Save generated tests into the canonical repository `pw-ai-agents/tests/ui/generated`
 const GENERATED_TESTS_DIR = resolvePwAiAgentsGeneratedDir(__dirname);

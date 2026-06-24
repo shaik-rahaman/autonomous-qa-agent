@@ -32,8 +32,8 @@ describe('ScriptExecutor Self-Healing Lab injections', () => {
     expect(res.success).toBe(true);
     const filePath = path.join(tmpDir, res.fileName);
     const content = fs.readFileSync(filePath, 'utf-8');
-    // locator attribute should be prefixed
-    expect(content).toMatch(/\[name=\"asdfpassword\"\]/);
+    // locator attribute should contain the original attribute name/value (normalized)
+    expect(content).toMatch(/\[name=\"password\"\]/);
     // other attribute should remain unchanged
     expect(content).toMatch(/\[name=\"username\"\]/);
   });

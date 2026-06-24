@@ -128,11 +128,14 @@ export class CodeValidator {
       warnings.forEach((warn) => logger.warn(`   - ${warn}`));
     }
 
+    // Apply wait pattern normalization to ensure robust navigation waits
+    const finalNormalized = valid ? this.normalizeWaitPatterns(normalized) : undefined;
+
     return {
       valid,
       errors,
       warnings,
-      normalized: valid ? normalized : undefined,
+      normalized: finalNormalized,
     };
   }
 
@@ -505,8 +508,132 @@ export class CodeValidator {
   }
 
   /**
+   * Normalize wait patterns to use robust Playwright waits instead of fixed sleeps
+   * Replaces problematic patterns like waitForTimeout(2000) with proper navigation waits
+   * and best practice patterns for login flows
+   */
+  private static normalizeWaitPatterns(code: string): string {
+    let normalized = code;
+    let changesApplied = 0;
+
+    // Pattern 1: Replace waitForTimeout with explicit waitForLoadState
+    // await page.waitForTimeout(2000) → await page.waitForLoadState("domcontentloaded", { timeout: 30000 })
+    const timeoutMatches = (code.match(/await\s+page\.waitForTimeout\(\d+\)/g) || []).length;
+    if (timeoutMatches > 0) {
+      normalized = normalized.replace(
+        /await\s+page\.waitForTimeout\(\d+\)/g,
+        'await page.waitForLoadState("domcontentloaded", { timeout: 30000 })'
+      );
+      changesApplied += timeoutMatches;
+      logger.debug(`  ✓ Replaced ${timeoutMatches} waitForTimeout() calls with robust waits`);
+    }
+
+    // Pattern 2: Replace generic waitForLoadState("load") with explicit timeout
+    // await page.waitForLoadState("load") → await page.waitForLoadState("domcontentloaded", { timeout: 30000 })
+    const loadMatches = (code.match(/await\s+page\.waitForLoadState\("load"\)/g) || []).length;
+    if (loadMatches > 0) {
+      normalized = normalized.replace(
+        /await\s+page\.waitForLoadState\("load"\)/g,
+        'await page.waitForLoadState("domcontentloaded", { timeout: 30000 })'
+      );
+      changesApplied += loadMatches;
+      logger.debug(`  ✓ Replaced ${loadMatches} waitForLoadState("load") with timeout`);
+    }
+
+    // Pattern 3: Replace waitForLoadState("networkidle") - often times out on slow networks
+    // await page.waitForLoadState("networkidle") → await page.waitForLoadState("domcontentloaded", { timeout: 30000 })
+    const networkIdleMatches = (code.match(/await\s+page\.waitForLoadState\("networkidle"\)/g) || []).length;
+    if (networkIdleMatches > 0) {
+      normalized = normalized.replace(
+        /await\s+page\.waitForLoadState\("networkidle"\)/g,
+        'await page.waitForLoadState("domcontentloaded", { timeout: 30000 })'
+      );
+      changesApplied += networkIdleMatches;
+      logger.debug(`  ✓ Replaced ${networkIdleMatches} waitForLoadState("networkidle") with domcontentloaded`);
+    }
+
+    // Pattern 4: For login flows - detect click + sleep + assertion pattern
+    // This is a multi-line pattern: click() followed by waitForTimeout followed by assertion
+    // Replace with proper navigation waits
+    
+    // Look for: await page.getByRole("button", { name: /login/i }).click();
+    //           await page.waitForTimeout(...);
+    //           Replace with: await page.waitForURL(...) and await page.waitForLoadState(...)
+    
+    const loginClickPattern = /await\s+page\.getByRole\("button",\s*\{\s*name:\s*\/([^\/]+)\/i?\s*\}\s*\)\.click\(\);\s*\n\s*await\s+page\.waitForTimeout\(\d+\)/g;
+    const loginMatches = (code.match(loginClickPattern) || []).length;
+    if (loginMatches > 0) {
+      normalized = normalized.replace(loginClickPattern, (match) => {
+        const buttonName = match.match(/name:\s*\/([^\/]+)\//)?.[1] || "button";
+        return `await page.getByRole("button", { name: /${buttonName}/i }).click();
+    await page.waitForURL(/dashboard|home|authenticated/i, { timeout: 30000 });
+    await page.waitForLoadState("domcontentloaded", { timeout: 30000 })`;
+      });
+      changesApplied += loginMatches;
+      logger.debug(`  ✓ Replaced ${loginMatches} login flow patterns with robust waits`);
+    }
+
+    // Pattern 5: Replace bare sleep after click action
+    // Look for any click() followed by waitForTimeout and add waitForURL if missing
+    const clickSleepPattern = /\.click\(\);\s*\n\s*await\s+page\.waitForTimeout\(\d+\)/g;
+    const clickMatches = (code.match(clickSleepPattern) || []).length;
+    if (clickMatches > 0) {
+      normalized = normalized.replace(clickSleepPattern, (match) => {
+        // Check if next line already has waitForURL - if not, add it
+        return `.click();
+    await page.waitForLoadState("domcontentloaded", { timeout: 30000 })`;
+      });
+      changesApplied += clickMatches;
+      logger.debug(`  ✓ Replaced ${clickMatches} click+sleep patterns`);
+    }
+
+    // Pattern 6: Add explicit timeouts to all expect() assertions if missing
+    // expect(...).toBeVisible() → expect(...).toBeVisible({ timeout: 10000 })
+    const visibleMatches = (code.match(/expect\(([^)]+)\)\.toBeVisible\(\)/g) || []).length;
+    if (visibleMatches > 0) {
+      normalized = normalized.replace(
+        /expect\(([^)]+)\)\.toBeVisible\(\)/g,
+        'expect($1).toBeVisible({ timeout: 10000 })'
+      );
+      changesApplied += visibleMatches;
+      logger.debug(`  ✓ Added timeout to ${visibleMatches} toBeVisible() assertions`);
+    }
+
+    // Pattern 7: Add explicit timeouts to toHaveText if missing
+    // expect(...).toHaveText(...) → expect(...).toHaveText(..., { timeout: 10000 })
+    const textMatches = (code.match(/expect\(([^)]+)\)\.toHaveText\(([^)]+)\)(?!\s*\{)/g) || []).length;
+    if (textMatches > 0) {
+      normalized = normalized.replace(
+        /expect\(([^)]+)\)\.toHaveText\(([^)]+)\)(?!\s*\{)/g,
+        'expect($1).toHaveText($2, { timeout: 10000 })'
+      );
+      changesApplied += textMatches;
+      logger.debug(`  ✓ Added timeout to ${textMatches} toHaveText() assertions`);
+    }
+
+    // Pattern 8: Ensure goto has proper waitUntil strategy and timeout
+    // If goto doesn't have waitUntil, add it with explicit timeout
+    const gotoMatches = (code.match(/await\s+page\.goto\("([^"]+)"\)(?!\s*\{)/g) || []).length;
+    if (gotoMatches > 0) {
+      normalized = normalized.replace(
+        /await\s+page\.goto\("([^"]+)"\)(?!\s*\{)/g,
+        'await page.goto("$1", { waitUntil: "domcontentloaded", timeout: 60000 })'
+      );
+      changesApplied += gotoMatches;
+      logger.debug(`  ✓ Added waitUntil and timeout to ${gotoMatches} goto() calls`);
+    }
+
+    if (changesApplied > 0) {
+      logger.info(`🔧 Normalized ${changesApplied} wait patterns to use robust Playwright waits`);
+    }
+
+    return normalized;
+  }
+
+  /**
    * Generate fallback valid Playwright test if code is invalid
    * This ensures we always have a syntactically valid test
+   * Uses Playwright best practices: robust navigation waits instead of fixed sleeps
    */
   static generateFallbackTest(testSteps: string, url: string): string {
     logger.warn('🔄 Generating fallback Playwright test due to validation failure');
@@ -524,11 +651,22 @@ export class CodeValidator {
 
 test("${safeName || 'Generated test'}", async ({ page }) => {
   try {
-    await page.goto("${url}");
-    await page.waitForLoadState("load");
+    // Navigate to the application
+    await page.goto("${url}", { waitUntil: "domcontentloaded", timeout: 60000 });
     
     // Test steps from: ${testSteps.substring(0, 100)}
-    // TODO: Add specific test assertions
+    // TODO: Add specific test assertions and interactions
+    
+    // Best practice example for interactive flows:
+    // 1. Interact with element (click, fill, etc.)
+    // 2. Wait for navigation or URL change if expected
+    // 3. Wait for page to stabilize (domcontentloaded or specific element)
+    // 4. Assert expected result
+    
+    // await page.getByRole("button", { name: /login/i }).click();
+    // await page.waitForURL(/dashboard/i, { timeout: 30000 });
+    // await page.waitForLoadState("domcontentloaded", { timeout: 30000 });
+    // await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
     
   } catch (error) {
     console.error("Test failed:", error);

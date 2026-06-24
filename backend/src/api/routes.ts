@@ -361,8 +361,7 @@ router.get('/debug/error-object', (req: Request, res: Response) => {
 
       logger.info('GET /debug/env', env);
 
-      // Do NOT return secret values (only presence/status)
-      res.json({ success: true, env });
+            // (debug/env returns environment info only)
     } catch (e) {
       logger.error('Failed to read env for /debug/env', e);
       res.status(500).json({ success: false, error: 'Failed to read env' });
@@ -622,6 +621,7 @@ router.post('/scripts/execute', async (req: Request, res: Response) => {
  * Execute a script in self-healing lab mode with intentional failures
  */
 router.post('/healing-lab/run', async (req: Request, res: Response) => {
+  console.log('HEALING_ROUTE_ENTERED_99999');
   try {
     logger.section('POST /healing-lab/run');
 
@@ -648,18 +648,19 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
     });
 
     // Debug: surface presence of critical environment variables used by healing
+    const configuredHealing = process.env.HEALING_ENABLED === 'true';
     const envStatus = {
-      HEALING_ENABLED: process.env.HEALING_ENABLED === 'true',
+      configuredHEALING_ENABLED: configuredHealing,
       GROQ_API_KEY_present: !!process.env.GROQ_API_KEY,
       MCP_SERVER_URL_present: !!process.env.MCP_SERVER_URL,
       MCP_SERVER_URL: process.env.MCP_SERVER_URL || null,
     };
     logger.info('Self-Healing Lab env status', envStatus);
 
-    // Force healing enabled for Self-Healing Lab runs and surface explicit log
+    // Force healing enabled for Self-Healing Lab runs (temporary override)
     const prevHealingEnv = process.env.HEALING_ENABLED;
     process.env.HEALING_ENABLED = 'true';
-    logger.info('HEALING ACTIVE: TRUE');
+    logger.info(`HEALING ACTIVE: TRUE (overridden, configured=${configuredHealing})`);
 
     // Prepare script with intentional failure injection
     const prepResult = await scriptExecutor.executeSelfHealingLabScript({ script, failureType, url, localLocatorTest });
@@ -686,7 +687,41 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
     let initialResult: any = null;
     try {
       logger.info('Self-Healing Lab: Running initial test execution to capture real error');
+      // Print the exact generated temp file contents immediately before execution for diagnostics
+      try {
+        const genPath = scriptExecutor.resolveGeneratedScriptPath(fileName);
+        if (fs.existsSync(genPath)) {
+          const genContent = fs.readFileSync(genPath, 'utf-8');
+          console.log('[HEALING-LAB] GENERATED SCRIPT CONTENTS BEFORE EXECUTION:\n' + genContent);
+        } else {
+          console.log('[HEALING-LAB] GENERATED SCRIPT PATH NOT FOUND: ' + genPath);
+        }
+      } catch (e) {
+        logger.debug('Could not read generated script before execution', e instanceof Error ? e.message : String(e));
+      }
+      console.log('BEFORE_EXECUTE_TEST_66666');
       initialResult = await executorService.executeTest(fileName);
+      console.log('AFTER_EXECUTE_TEST_66666');
+      console.log('AFTER_EXECUTION_RETURN_77777');
+
+      // Diagnostic tracing: surface execution return and healing flags
+      try {
+        logger.info('AFTER_EXECUTION_RETURN', {
+          id: initialResult?.id,
+          status: initialResult?.status,
+          failed: initialResult?.failed,
+          totalTests: initialResult?.totalTests,
+          exitCode: (initialResult as any)?.exitCode || null,
+          lastReachedLocator: (initialResult as any)?.lastReachedLocator || null,
+        });
+      } catch (e) {}
+
+      logger.info('ENTER_HEALING_ROUTE', {
+        configuredHEALING_ENABLED: configuredHealing,
+        HEALING_ENABLED_env: process.env.HEALING_ENABLED,
+        prevHealingEnv: prevHealingEnv,
+      });
+
       logger.info('Self-Healing Lab: Initial execution completed', { id: initialResult.id, status: initialResult.status });
     } catch (execErr) {
       logger.warn('Self-Healing Lab: Initial execution failed', execErr instanceof Error ? execErr.message : String(execErr));
@@ -694,6 +729,9 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
 
     // Determine actual playwright error summary
     const actualPlaywrightError = (initialResult && (initialResult as any).playwrightError) || (initialResult && (initialResult.stderr || initialResult.stdout)) || null;
+
+    // Will be populated with any failed locators extracted from Playwright output
+    let detectedFailedLocators: string[] | null = null;
 
     // Validate failure type: for ELEMENT_NOT_FOUND, ensure the healing-lab run reached the injected locator
     // If the injected locator was not reached before the failure, mark as PRE_LOCATOR_FAILURE and skip healing
@@ -717,6 +755,15 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
         }
       }
       const actualOutput = String(initialResult?.stdout || '') + '\n' + String(initialResult?.stderr || '');
+    console.log('BEFORE_PLAYWRIGHT_ERROR_BLOCK_88888');
+
+      console.log('[HEALING-LAB] PLAYWRIGHT_ERROR_START');
+      console.log('BACKEND_ROUTES_TS_MARKER_12345');
+console.log(actualPlaywrightError);
+console.log('[HEALING-LAB] PLAYWRIGHT_ERROR_END');
+
+      console.log('[HEALING-LAB] OUTPUT_CONTAINS_WAITING_FOR_LOCATOR:',
+  actualOutput.includes('waiting for locator'));
 
       const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[A-Za-z]/gi, '');
       const normalize = (s: any) => {
@@ -726,7 +773,7 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
 
       if (failureType === 'ELEMENT_NOT_FOUND') {
         if (!injectedSelector) {
-          // TASK 4-5: Guard against empty selector
+          // Guard against empty selector - this is a true pre-locator failure
           invalidHealingScenario = 'PRE_LOCATOR_FAILURE';
           logger.warn('PRE_LOCATOR_FAILURE: No injected selector found in prepared script');
           console.error('[HEALING-LAB] SelectorExtractionBug: injectedSelector is empty after script preparation');
@@ -734,55 +781,152 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
             (prepResult as any).injectedSelector || 'undefined', createdFilePath, 
             createdFilePath ? fs.existsSync(createdFilePath) : 'N/A');
         } else {
-          // TASK 4: Print failed selector
+          // FIX: Rewrite locator failure detection to NOT rely on REACHED LOCATOR logs
+          // REACHED LOCATOR logs fire BEFORE Playwright tries to find the element, so they
+          // cannot be used as evidence of successful locator operations.
+          // Instead, look for Playwright's "waiting for locator" error which indicates
+          // the locator operation actually failed.
           console.log('[HEALING-LAB] FAILED SELECTOR: ' + injectedSelector);
-          // Robustly strip ANSI CSI sequences (handles \u001b, colors, cursor movement, etc.)
-          const cleanOut = String(actualOutput).replace(/(?:\\u001b|\\x1B|\u001b|\x1B)\[[0-9;?]*[ -\/]*[@-~]/g, '');
-          // Match full tag '[HEALING LAB] REACHED LOCATOR: <selector>' for clearer captures
-          const re = /\[HEALING LAB\]\s*REACHED LOCATOR:\s*(.*)/g;
-          let m: RegExpExecArray | null;
-          const reachedList: string[] = [];
-          while ((m = re.exec(cleanOut)) !== null) {
-            if (m[1]) {
-              // Normalize entry: remove escaping/backslashes and surrounding quotes
-              const entry = String(m[1]).replace(/\\/g, '').trim().replace(/^("|'|`)|("|'|`)$/g, '');
-              reachedList.push(entry);
-            }
-          }
-          logger.info('HEALING LAB: raw cleaned output snippet', { snippet: cleanOut.substring(0, 400) });
-
+          
+          // Prefer Playwright's extracted error as primary analysis source (falls back to stdout/stderr)
+          const locatorAnalysisSource = String(actualPlaywrightError || actualOutput || '');
+          try {
+            logger.info('LOCATOR_ANALYSIS_SOURCE', { sourcePreview: locatorAnalysisSource.substring(0, 1000) });
+            const containsWaiting = /waiting for\s+locator/i.test(locatorAnalysisSource);
+            logger.info('LOCATOR_ANALYSIS_CONTAINS_WAITING', { containsWaiting });
+            console.log('[HEALING-LAB] LOCATOR_ANALYSIS_CONTAINS_WAITING:', containsWaiting);
+          } catch (e) {}
+          // Strip ANSI escape sequences to clean the chosen analysis source
+          const cleanOut = locatorAnalysisSource.replace(/(?:\\u001b|\\x1B|\u001b|\x1B)\[[0-9;?]*[ -\/]*[@-~]/g, '');
           const normInjected = normalize(injectedSelector);
-          // TASK 4-5: Guard against empty normalization
+          
           if (!normInjected) {
             invalidHealingScenario = 'PRE_LOCATOR_FAILURE';
             console.error('[HEALING-LAB] SelectorExtractionBug: normInjected is empty after normalization');
             console.error('[HEALING-LAB] Diagnostic: injectedSelector=%s', injectedSelector);
-          }
-          
-          // Tolerant matching: also consider attribute value token match (e.g., asdfdpassword)
-          const anyMatched = normInjected && reachedList.some((r) => {
-            const nr = normalize(r);
-            if (nr && normInjected && (nr === normInjected || nr.includes(normInjected) || normInjected.includes(nr))) return true;
-            // extract token from injected selector such as value inside quotes
-            const tokenMatch = String(normInjected || '').match(/=["']?([^"'\]]+)["']?/) || String(normInjected || '').match(/([a-zA-Z0-9_-]{3,})/);
-            const token = tokenMatch ? tokenMatch[1] : null;
-            if (token && nr && nr.includes(token)) return true;
-            return false;
-          });
-
-          logger.info('HEALING LAB: locator reach list', { reachedList, injectedSelector, anyMatched });
-
-          if (anyMatched) {
-            logger.info('HEALING LAB: injected locator was reached (via output parsing)', { injectedSelector, reachedList });
           } else {
-            // TASK 3: Use lastReachedLocator from execution if available
-            if ((initialResult as any).lastReachedLocator) {
-              console.log('[HEALING-LAB] Using lastReachedLocator from execution: ' + (initialResult as any).lastReachedLocator);
-              // Don't mark as failure - we have reached locator from execution output
-            } else {
-              logger.warn('PRE_LOCATOR_FAILURE: injected locator was not reached before failure', { injectedSelector, reachedList });
-              invalidHealingScenario = 'PRE_LOCATOR_FAILURE';
+            // Step 1: Extract all REACHED LOCATOR logs (for diagnostics only - do NOT use for decisions)
+            const reachedLocatorPattern = /\[HEALING LAB\]\s*REACHED LOCATOR:\s*(.*)/g;
+            let m: RegExpExecArray | null;
+            const reachedList: string[] = [];
+            while ((m = reachedLocatorPattern.exec(cleanOut)) !== null) {
+              if (m[1]) {
+                const entry = String(m[1]).replace(/\\/g, '').trim().replace(/^("|'|`)|("|'|`)$/g, '');
+                reachedList.push(entry);
+                logger.info('LOCATOR_REACHED_STATEMENT', { statement: entry });
+              }
             }
+            
+            // Step 2: Check if we found any REACHED LOCATOR logs
+            const didReachLocatorStatement = reachedList.length > 0;
+            
+            // Step 3: Look for Playwright's "waiting for locator" error pattern
+            // Use the explicit Playwright error text as the primary source for extraction
+            const failedLocatorRegex = /waiting for\s+locator\(\s*["'`]?([^"'`\)]+)["'`]?\s*\)/gi;
+            // Use actualPlaywrightError as the source per request (fallback not used for extraction)
+            const failedLocatorInputRaw = String(actualPlaywrightError || '');
+            // Diagnostic: show exact input used for locator extraction (trim to reasonable length)
+            console.log('[HEALING-LAB] FAILED_LOCATOR_EXTRACTION_INPUT:', failedLocatorInputRaw.substring(0, 2000));
+
+            // Strip ANSI escape sequences for matching
+            const failedLocatorInput = failedLocatorInputRaw.replace(/(?:\\u001b|\\x1B|\u001b|\x1B)\[[0-9;?]*[ -\/]*[@-~]/g, '');
+
+            const failedLocators: string[] = [];
+            const failedLocatorMatches: string[] = [];
+            let failMatch: RegExpExecArray | null;
+            while ((failMatch = failedLocatorRegex.exec(failedLocatorInput)) !== null) {
+              if (failMatch[1]) {
+                const raw = String(failMatch[1]);
+                const failedSelector = normalize(raw);
+                failedLocators.push(failedSelector || raw);
+                failedLocatorMatches.push(raw);
+
+                // Check if this failed locator matches the injected selector
+                if (failedSelector && normInjected && 
+                    (failedSelector === normInjected || 
+                     failedSelector.includes(normInjected) || 
+                     normInjected.includes(failedSelector))) {
+                  logger.info('LOCATOR_OPERATION_FAILED', { selector: failedSelector, injectedSelector });
+                  console.log('[HEALING-LAB] LOCATOR_OPERATION_FAILED: ' + failedSelector);
+                  console.log('[HEALING-LAB] HEALING_TRIGGER_SELECTOR: ' + normInjected);
+                  // Healing SHOULD run for this selector
+                  invalidHealingScenario = false;
+                }
+              }
+            }
+
+            // Diagnostic: surface matches array and regex used
+            console.log('[HEALING-LAB] FAILED_LOCATOR_EXTRACTION_MATCHES:', JSON.stringify(failedLocatorMatches));
+            console.log('[HEALING-LAB] FAILED_LOCATOR_EXTRACTION_REGEX:', failedLocatorRegex.toString());
+
+            // persist extracted failed locators for use by fast-path retry logic later
+            if (failedLocators.length > 0) detectedFailedLocators = failedLocators.slice();
+
+            // Fallback: if we couldn't extract failed locators from the Playwright error,
+            // use executor-provided lastReachedLocator as authoritative fallback.
+            if ((!failedLocators || failedLocators.length === 0) && initialResult && (initialResult as any).lastReachedLocator) {
+              const fb = String((initialResult as any).lastReachedLocator);
+              console.log('[HEALING-LAB] FAILED_LOCATOR_FALLBACK_USED: true');
+              console.log('[HEALING-LAB] FAILED_LOCATOR_FALLBACK_VALUE: ' + fb);
+              try {
+                const normFb = normalize(fb);
+                failedLocators.push(normFb || fb);
+              } catch (e) {
+                failedLocators.push(fb);
+              }
+              detectedFailedLocators = failedLocators.slice();
+            }
+            
+            // Step 4: Check for timeout messages
+            const timeoutPattern = /timeout|timed out/i;
+            if (timeoutPattern.test(cleanOut)) {
+              logger.info('TIMEOUT_DETECTED_IN_OUTPUT', { injectedSelector });
+              if (!invalidHealingScenario) {
+                console.log('[HEALING-LAB] LOCATOR_OPERATION_FAILED: Timeout detected');
+                console.log('[HEALING-LAB] HEALING_TRIGGER_SELECTOR: ' + normInjected);
+              }
+            }
+            
+            // Step 5: Determine if this is a pre-locator failure
+            // Only set PRE_LOCATOR_FAILURE if:
+            // - We have an injected selector, but
+            // - We never reached the locator statement (no REACHED LOCATOR logs), AND
+            // - We don't see "waiting for locator" pattern
+            if (!didReachLocatorStatement && failedLocators.length === 0) {
+              logger.warn('PRE_LOCATOR_FAILURE: injected locator was not reached before failure', 
+                { injectedSelector, reachedList, failedLocators });
+              invalidHealingScenario = 'PRE_LOCATOR_FAILURE';
+            } else if (didReachLocatorStatement && failedLocators.length === 0) {
+              // Reached the statement but no "waiting for locator" pattern found
+              // This suggests the locator succeeded (no error reported)
+              logger.info('LOCATOR_OPERATION_SUCCEEDED', { injectedSelector, reachedList });
+              console.log('[HEALING-LAB] LOCATOR_OPERATION_SUCCEEDED: ' + injectedSelector);
+              // Do NOT set invalidHealingScenario - healing can still run as fallback
+            }
+            
+            logger.info('HEALING LAB: locator operation analysis', { 
+              injectedSelector, 
+              didReachLocatorStatement,
+              failedLocators, 
+              invalidHealingScenario 
+            });
+            // NEW DIAGNOSTIC LOGS: surface selector comparisons used for healing decisions
+            try {
+              const prepSelector = (prepResult as any)?.injectedSelector || null;
+              const validationSelector = normInjected || prepSelector;
+              const playFailed = failedLocators && failedLocators.length ? failedLocators : null;
+              const selectorMatched = !!(playFailed && validationSelector && playFailed.some(p => p === validationSelector || p.includes(validationSelector) || validationSelector.includes(p)));
+
+              logger.info('HEALING_VALIDATION_SELECTOR', { validationSelector });
+              logger.info('PLAYWRIGHT_FAILED_SELECTOR', { failedLocators: playFailed });
+              logger.info('PREP_RESULT_SELECTOR', { prepResult_injectedSelector: prepSelector });
+              logger.info('SELECTOR_MATCH_RESULT', { selectorMatched });
+
+              console.log('[HEALING-LAB] HEALING_VALIDATION_SELECTOR:', validationSelector);
+              console.log('[HEALING-LAB] PLAYWRIGHT_FAILED_SELECTOR:', JSON.stringify(playFailed));
+              console.log('[HEALING-LAB] PREP_RESULT_SELECTOR:', prepSelector);
+              console.log('[HEALING-LAB] SELECTOR_MATCH_RESULT:', selectorMatched);
+            } catch (e) {}
           }
         }
       }
@@ -791,8 +935,21 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
     }
 
     let result: any;
-    if (invalidHealingScenario) {
-      // Skip full orchestration and return diagnostics indicating pre-locator failure
+    // Runtime diagnostic: log healing flag state and decision inputs
+    try {
+      logger.info('HEALING_FLAG_DEBUG', {
+        raw_HEALING_ENABLED: process.env.HEALING_ENABLED,
+        healingEnabled_eval: process.env.HEALING_ENABLED === 'true',
+        invalidHealingScenario,
+      });
+    } catch (e) {}
+
+    const healingEnabled = process.env.HEALING_ENABLED === 'true';
+
+    if (invalidHealingScenario && !healingEnabled) {
+      // Healing disabled: Skip full orchestration and return diagnostics indicating pre-locator failure
+      logger.warn('PRE_LOCATOR_FAILURE_TRIGGERED', { reason: invalidHealingScenario });
+      logger.warn('PRE_LOCATOR_FAILURE_REASON', 'Injected locator not found or not reached before failure and healing is disabled - skipping healing');
       result = initialResult || {
         id: `exec-${Date.now()}`,
         testFile: fileName,
@@ -808,9 +965,37 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
         reused: false,
       };
     } else {
+      // Either no invalid scenario, or healing is enabled and we should continue to healing
+      if (invalidHealingScenario && healingEnabled) {
+        logger.warn('PRE_LOCATOR_FAILURE_TRIGGERED', { reason: invalidHealingScenario });
+        logger.info('PRE_LOCATOR_FAILURE_REASON', 'Injected locator not found or not reached before failure, but healing is enabled - continuing to healing');
+        logger.info('CONTINUING_TO_HEALING');
+      }
       // Proceed with full orchestration (healing) using LangChain orchestrator
+      // NOTE: Deterministic demo fast-paths (e.g., prefix-based 'asdf' repairs) have been removed
+      // to ensure the healing engine receives the actual failed locator and error context.
       try {
-        result = await runWithLangChain({ testFile: fileName, targetUrl: url, projectRoot: '.' });
+        logger.info('CALLING_RUN_WITH_LANGCHAIN', { testFile: fileName });
+
+        // Determine the preferred failed selector to pass into the orchestration layer
+        const preferredFailedSelector = (detectedFailedLocators && detectedFailedLocators.length)
+          ? detectedFailedLocators[0]
+          : ((initialResult as any)?.lastReachedLocator || (prepResult as any)?.injectedSelector || undefined);
+
+        console.log('[HEALING-LAB] FAILED_SELECTOR_SELECTED:', preferredFailedSelector);
+        console.log('[HEALING-LAB] HEALING_INPUT_SELECTOR:', { detectedFailedLocators: detectedFailedLocators ? detectedFailedLocators.slice(0,3) : null, lastReachedLocator: (initialResult as any)?.lastReachedLocator, prep_injected: (prepResult as any)?.injectedSelector });
+
+        result = await runWithLangChain({
+          testFile: fileName,
+          targetUrl: url,
+          projectRoot: '.',
+          // forward context to the orchestration layer (preferred order: detectedFailedLocators[0] || lastReachedLocator || prep.injectedSelector)
+          failedLocator: preferredFailedSelector,
+          actualPlaywrightError: actualPlaywrightError,
+          lastReachedLocator: (initialResult as any)?.lastReachedLocator,
+        } as any);
+
+        console.log('[HEALING-LAB] HEALING_PIPELINE_SELECTOR:', preferredFailedSelector);
       } catch (e) {
         logger.error('LangChain orchestration failed', e instanceof Error ? e.message : String(e));
         result = initialResult || { id: `exec-${Date.now()}`, testFile: fileName, status: 'error', passed: 0, failed: 1, skipped: 0, totalTests: 1, stdout: '', stderr: String(e), errors: [String(e)], healed: false, reused: false };
@@ -821,15 +1006,27 @@ router.post('/healing-lab/run', async (req: Request, res: Response) => {
     if (typeof prevHealingEnv === 'undefined') delete process.env.HEALING_ENABLED;
     else process.env.HEALING_ENABLED = prevHealingEnv;
 
-    // Store the result
-    executorService.saveExecution(result.id, result);
+    // Store the result (ensure it has an ID first)
+    try {
+      if (!result.id) {
+        // Defensive: some orchestration paths may return result-like objects
+        // without an `id`. Generate a stable execution id to store the result.
+        result.id = `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        logger.warn('Assigned fallback execution id for healing result', { id: result.id });
+      }
+      // Explicit console log to make save attempts visible in stdout/stderr
+      console.log('[HEALING-LAB] SAVING_EXECUTION:', result.id);
+      executorService.saveExecution(result.id, result);
 
-    logger.success('Self-healing lab execution completed', {
-      id: result.id,
-      failureType,
-      status: result.status,
-      healed: result.healed,
-    });
+      logger.success('Self-healing lab execution completed', {
+        id: result.id,
+        failureType,
+        status: result.status,
+        healed: result.healed,
+      });
+    } catch (saveErr) {
+      logger.error('Failed to save self-healing execution result', saveErr instanceof Error ? saveErr.message : String(saveErr));
+    }
 
     // Construct report URL
     const reportUrl = `/report/${result.id}`;

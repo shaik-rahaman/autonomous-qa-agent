@@ -22,8 +22,12 @@ export class MCPClient {
    */
   private async initBrowser(): Promise<void> {
     if (this.browser) return;
-    logger.info('🌐 MCP: Launching Chromium browser in HEADFUL mode for real DOM analysis');
-    this.browser = await chromium.launch({ headless: false });
+    // Respect environment flags for headless mode. Default to headless=true for server usage.
+    const envMcpHeadless = typeof process.env.MCP_HEADLESS !== 'undefined' ? process.env.MCP_HEADLESS : undefined;
+    const envHeadless = typeof process.env.HEADLESS !== 'undefined' ? process.env.HEADLESS : undefined;
+    const headless = (envMcpHeadless ? String(envMcpHeadless) : (envHeadless ? String(envHeadless) : 'true')).toLowerCase() === 'true';
+    logger.info(`🌐 MCP: Launching Chromium browser (headless=${headless}) for real DOM analysis`);
+    this.browser = await chromium.launch({ headless });
   }
 
   /**
@@ -35,7 +39,14 @@ export class MCPClient {
     try {
       await this.initBrowser();
       this.page = await this.browser!.newPage();
-      await this.page.goto(url, { waitUntil: 'networkidle', timeout: 15000 });
+      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+      // Wait for networkidle and a short buffer to improve DOM extraction reliability
+      await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+        logger.warn('MCP networkidle timeout');
+      });
+      await this.page.waitForTimeout(2000);
+
       logger.success(`✓ MCP: Successfully loaded ${url}`);
     } catch (error) {
       logger.error('✗ MCP: Failed to open URL', error);
@@ -48,6 +59,7 @@ export class MCPClient {
    */
   async getDomJson(url: string): Promise<DOMResponse> {
     logger.info(`📊 MCP: Analyzing REAL DOM structure for ${url}`);
+    logger.info('MCP_ENTERED');
 
     try {
       // Open URL if not already open
@@ -57,12 +69,43 @@ export class MCPClient {
 
       const title = await this.page!.title();
 
+      // Before extracting, validate navigation succeeded and add diagnostics
+      if (!this.page) throw new Error('MCP: no page available for DOM extraction');
+      const currentUrl = this.page.url();
+      if (!currentUrl || currentUrl === 'about:blank') {
+        const msg = `MCP_NAVIGATION_FAILED: page.url()=${currentUrl}`;
+        logger.error(msg);
+        throw new Error(msg);
+      }
+
+      // Diagnostics: report URL, title, and counts of inputs/buttons
+      try {
+        logger.info('MCP_URL', await this.page.url());
+        logger.info('MCP_TITLE', await this.page.title());
+        try {
+          const inputCount = await this.page.locator('input').count();
+          logger.info('MCP_INPUT_COUNT', inputCount);
+        } catch (e) {
+          logger.warn('MCP_INPUT_COUNT failed', e instanceof Error ? e.message : String(e));
+        }
+        try {
+          const buttonCount = await this.page.locator('button').count();
+          logger.info('MCP_BUTTON_COUNT', buttonCount);
+        } catch (e) {
+          logger.warn('MCP_BUTTON_COUNT failed', e instanceof Error ? e.message : String(e));
+        }
+      } catch (diagErr) {
+        logger.warn('MCP diagnostics failed', diagErr instanceof Error ? diagErr.message : String(diagErr));
+      }
+
       // Extract real interactive elements from page
       const elements: DOMElement[] = await this.page!.evaluate(() => {
         const result: any[] = [];
 
         // Get all interactive elements
         const selectors = [
+          // include bare input to catch inputs without explicit type attribute
+          'input',
           'input[type="text"]',
           'input[type="email"]',
           'input[type="password"]',
@@ -136,6 +179,37 @@ export class MCPClient {
 
         return result.slice(0, 50); // Limit to 50 elements
       });
+
+      // Diagnostic: log each extracted element for visibility
+      // Also surface explicit input diagnostics so we can trace missing inputs
+      const inputs = elements.filter(e => {
+        const sel = String((e as any).selector || '').toLowerCase();
+        const role = String((e as any).role || '').toLowerCase();
+        const type = String((e as any).type || '').toLowerCase();
+        return sel.includes('input') || role.includes('input') || ['text','password','email','tel','number'].includes(type) || (!!(e as any).placeholder) || !!(e as any).name;
+      });
+      try {
+        logger.info('MCP_RAW_INPUT_COUNT', inputs.length);
+        inputs.forEach((input, idx) => {
+          logger.info(`MCP_INPUT_${idx}`, JSON.stringify(input));
+        });
+      } catch (e) {
+        logger.warn('MCP input logging failed', e instanceof Error ? e.message : String(e));
+      }
+
+      logger.info('MCP_ELEMENTS_FOUND');
+      for (const el of elements) {
+        logger.info(JSON.stringify({
+          selector: el.selector,
+          tag: (el as any).tag || null,
+          type: el.type || null,
+          name: el.name || null,
+          id: (el as any).id || null,
+          placeholder: el.placeholder || null,
+          text: (el as any).text || null,
+          role: (el as any).role || null,
+        }));
+      }
 
       const pageType = this.detectPageType(title, url);
       logger.success(`✓ MCP: Found ${elements.length} real interactive elements (${pageType} page)`);

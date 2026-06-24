@@ -8,6 +8,7 @@ import routes from './api/routes';
 import jiraRoutes from './api/jira-routes';
 import { executorService } from './execution/executor-service';
 import { logger } from './utils/logger';
+import { initializePlaywrightBrowsers } from './execution/browser-setup';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -265,19 +266,36 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  logger.success(`Server running on http://localhost:${PORT}`);
-  logger.info('Available endpoints:');
-  logger.info('  GET  /                  - API info');
-  logger.info('  GET  /api/health        - Health check');
-  logger.info('  POST /api/generate-test - Generate test from English');
-  logger.info('  GET  /api/tests         - List all generated tests');
-  logger.info('  GET  /api/tests/:file   - Get specific test');
-  logger.info('  POST /api/execute       - Execute a test file');
-  logger.info('  GET  /api/execution/:id - Get execution result');
-  logger.info('  GET  /api/execution/:id/logs - Get execution logs');
-  logger.info('  GET  /api/executions    - List recent executions');
-});
+async function startServer() {
+  app.listen(PORT, async () => {
+    logger.success(`Server running on http://localhost:${PORT}`);
+    logger.info('Available endpoints:');
+    logger.info('  GET  /                  - API info');
+    logger.info('  GET  /api/health        - Health check');
+    logger.info('  POST /api/generate-test - Generate test from English');
+    logger.info('  GET  /api/tests         - List all generated tests');
+    logger.info('  GET  /api/tests/:file   - Get specific test');
+    logger.info('  POST /api/execute       - Execute a test file');
+    logger.info('  GET  /api/execution/:id - Get execution result');
+    logger.info('  GET  /api/execution/:id/logs - Get execution logs');
+    logger.info('  GET  /api/executions    - List recent executions');
+
+    // PHASE 1 OPTIMIZATION: Initialize Playwright browsers at startup
+    // Avoids 120-second installation check on every test execution
+    logger.section('PHASE 1 OPTIMIZATION: Browser Initialization');
+    try {
+      logger.info('Initializing Playwright browsers (one-time operation)...');
+      const initStartTime = Date.now();
+      await initializePlaywrightBrowsers();
+      const initTime = Date.now() - initStartTime;
+      logger.success(`Playwright browsers ready (initialized in ${initTime}ms)`);
+    } catch (err) {
+      logger.warn(`Browser initialization failed at startup (will retry on first test)`, err);
+    }
+  });
+}
+
+startServer();
 
 // If HEALING_ENABLED is explicitly set to 'false' at startup, abort to avoid
 // running in a misconfigured release state. This enforces the critical release

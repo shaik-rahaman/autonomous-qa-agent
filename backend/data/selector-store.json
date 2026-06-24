@@ -369,5 +369,166 @@
     "originalSelector": "[name=\"asdfdpassword\"]",
     "healedSelector": "[name=\"password\"]",
     "createdAt": 1780674334311
+  },
+  {
+    "step": "temp-1781849609162-05cfd8c3.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1781849867192
+  },
+  {
+    "step": "temp-1781860336872-6142ad62.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "', \".oxd-button.oxd-button--medium.oxd-button--main\"), page.locator(\".oxd-button.oxd-button--medium.oxd-button--main\")).click({ timeout: 5000 });",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1781860390700
+  },
+  {
+    "step": "temp-1781860394517-558bab6e.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "', \".oxd-button.oxd-button--medium.oxd-button--main\"), page.locator(\".oxd-button.oxd-button--medium.oxd-button--main\")).click({ timeout: 5000 });",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1781860421206
+  },
+  {
+    "step": "temp-1781860457240-9942866f.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "', \".oxd-button.oxd-button--medium.oxd-button--main\"), page.locator(\".oxd-button.oxd-button--medium.oxd-button--main\")).click({ timeout: 5000 });",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1781860483813
+  },
+  {
+    "step": "temp-1781860983603-bde9cd3e.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "', \".oxd-button.oxd-button--medium.oxd-button--main\"), page.locator(\".oxd-button.oxd-button--medium.oxd-button--main\")).click({ timeout: 5000 });",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1781861036137
+  },
+  {
+    "step": "temp-1781861604339-9a5388dd.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": ".oxd-button.oxd-button--medium.oxd-button--main",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1781861631874
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782133975200
+  },
+  {
+    "step": "temp-1782193324256-abaaa45f.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782193388850
+  },
+  {
+    "step": "test-self-healing.spec.ts",
+    "url": "unknown",
+    "originalSelector": "[name=\"asdfdpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782194638699
+  },
+  {
+    "step": "temp-1782198093493-0c745acf.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782198156388
+  },
+  {
+    "step": "temp-1782198602742-f9c6a941.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782198686613
+  },
+  {
+    "step": "temp-1782201097503-7ef78082.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782201155878
+  },
+  {
+    "step": "temp-1782202331750-58d289e8.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782202397058
+  },
+  {
+    "step": "temp-1782203055328-869d6349.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782203082702
+  },
+  {
+    "step": "temp-1782203363980-13b4b4a1.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"asdfpassword\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782203392141
+  },
+  {
+    "step": "temp-1782205112569-fac00d21.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"passwod\"]",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1782205141172
+  },
+  {
+    "step": "temp-1782206762154-db75f727.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"passwod\"]",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1782206847523
+  },
+  {
+    "step": "temp-1782221475460-5a67141c.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"passwod\"]",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1782221506330
+  },
+  {
+    "step": "temp-1782222096021-b91dbcfc.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"passwod\"]",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1782222135259
+  },
+  {
+    "step": "temp-1782223587115-1fc71579.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"passwod\"]",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1782223618388
+  },
+  {
+    "step": "temp-1782230424496-9c1ab1f9.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"passwod\"]",
+    "healedSelector": "button:has-text(\"Login\")",
+    "createdAt": 1782230456998
+  },
+  {
+    "step": "temp-1782231304880-fac2c240.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"passwod\"]",
+    "healedSelector": "[name=\"username\"]",
+    "createdAt": 1782231334022
+  },
+  {
+    "step": "temp-1782231782867-4f3114a9.spec.ts",
+    "url": "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    "originalSelector": "[name=\"passwod\"]",
+    "healedSelector": "[name=\"password\"]",
+    "createdAt": 1782231815592
   }
 ]

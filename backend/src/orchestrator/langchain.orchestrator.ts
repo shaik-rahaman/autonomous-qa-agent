@@ -9,6 +9,8 @@ import { z } from "zod";
 import { logger } from "../utils/logger";
 import { executorService, ExecutionResult } from "../execution/executor-service";
 import { healFailure, HealFailureInput } from "../agents/self-healing";
+import { extractFailedLocator, isValidSelector } from "../agents/self-healing/error-parser";
+import { fastPathHeal } from "../agents/self-healing/fast-path-healer";
 import { findSelectorFix, saveSelectorFix } from "../self-healing/selector-store";
 import { scriptExecutor } from "../services/script-executor";
 import path from "path";
@@ -255,9 +257,6 @@ Always follow this sequence:
 
     // Create agent executor
     logger.info(`🤖 [LangChain] Creating agent executor...`);
-    
-    // For now, manually orchestrate since LangChain agent setup can be complex
-    // But we'll implement proper agent routing for each step
     let result: ExecutionResult | null = null;
     let healed = false;
     let reused = false;
@@ -312,6 +311,21 @@ Always follow this sequence:
           console.log(`[ORCHESTRATOR] ⚠️  NAVIGATION TIMEOUT DETECTED`);
           console.log(`[ORCHESTRATOR] Classification: NAVIGATION_TIMEOUT`);
           console.log(`[ORCHESTRATOR] Action: SKIP HEALING - navigation failures are not locator issues`);
+
+            // Diagnostics requested: provide fuller context before early return
+            try {
+              console.log('NAV_TIMEOUT_DETECTED=true');
+              console.log('NAV_TIMEOUT_ERROR=', String(result.stderr || result.stdout || '(no error captured)'));
+              console.log('NAV_TIMEOUT_LAST_REACHED_LOCATOR=', (result as any).lastReachedLocator || 'N/A');
+              console.log('NAV_TIMEOUT_TEST_FILE=', testFile || 'unknown');
+              // Heuristic: would healing have run if this were not a navigation timeout?
+              const combinedForHealCheck = String(result.stderr || '') + '\n' + String(result.stdout || '');
+              const wouldHeal = /waiting for\s+locator|params\.selector|locator\s*\(/i.test(combinedForHealCheck);
+              console.log('NAV_TIMEOUT_HEALING_WOULD_HAVE_RUN=', wouldHeal ? 'true' : 'false');
+              console.log('EXECUTION_PHASE=', healed ? 'HEALED_RETRY' : 'INITIAL');
+            } catch (diagErr) {
+              console.warn('Failed to emit NAV timeout diagnostics', String(diagErr));
+            }
           
           // TASK 4: Skip healing for navigation timeouts
           logger.info(`⏭️  Navigation timeout detected - skipping locator healing`);
@@ -322,36 +336,51 @@ Always follow this sequence:
           };
         }
         
-        // FIX 4: Use lastReachedLocator from execution output (more reliable)
-        // This is populated by executor-service and includes the HEALING LAB instrumentation
-        const lastReached = (result as any).lastReachedLocator;
-        if (lastReached) {
-          failedSelector = lastReached;
-          console.log(`[ORCHESTRATOR] ✓ PRIORITY 1 (EXECUTION OUTPUT) - lastReachedLocator: ${failedSelector}`);
-          console.log(`[ORCHESTRATOR] SELECTOR_SOURCE: Execution lastReachedLocator (MOST RELIABLE)`);
-          console.log(`[ORCHESTRATOR] FAILED SELECTOR: ${failedSelector}`);
-        } else {
-          // Fallback: Extract from ACTUAL PLAYWRIGHT ERROR
-          const errorText = result.stderr + '\n' + result.stdout;
-          const cleanedErrorText = String(errorText || '').replace(/\x1B\[[0-9;]*m/g, '');
-          
-          // PRIORITY 2: Look for params.selector in error
-          let paramsSelectorMatch = errorText.match(/params\.selector\s*[=:]\s*['"]([^'"]+)['"]/);
-          if (paramsSelectorMatch && paramsSelectorMatch[1]) {
-            failedSelector = paramsSelectorMatch[1];
+        // PRIORITY 1: Playwright "waiting for locator('...')" pattern in stderr/stdout
+        const combinedOutput = String(result.stderr || '') + '\n' + String(result.stdout || '');
+        const cleanedErrorText = combinedOutput.replace(/\x1B\[[0-9;]*m/g, '');
+
+        const waitingForMatch = cleanedErrorText.match(/waiting for\s+locator\s*\(\s*(["'`])([^\)]+?)\1\s*\)/i);
+        if (waitingForMatch && waitingForMatch[2]) {
+          const candidate = waitingForMatch[2].trim();
+          if (isValidSelector(candidate)) {
+            failedSelector = candidate;
+            console.log(`ACTUAL_FAILED_SELECTOR=${failedSelector}`);
+            console.log(`FAILED_SELECTOR_SOURCE=playwright_error`);
+            console.log(`[ORCHESTRATOR] ✓ PRIORITY 1 - waiting-for locator pattern: ${failedSelector}`);
+          }
+        }
+
+        // PRIORITY 2: params.selector in error object/text
+        if (!failedSelector) {
+          const paramsSelectorMatch = cleanedErrorText.match(/params\.selector\s*[=:]\s*['"]([^'"\n]+?)['"]/i);
+          if (paramsSelectorMatch && paramsSelectorMatch[1] && isValidSelector(paramsSelectorMatch[1])) {
+            failedSelector = paramsSelectorMatch[1].trim();
+            console.log(`ACTUAL_FAILED_SELECTOR=${failedSelector}`);
+            console.log(`FAILED_SELECTOR_SOURCE=params.selector`);
             console.log(`[ORCHESTRATOR] ✓ PRIORITY 2 - params.selector: ${failedSelector}`);
-            console.log(`[ORCHESTRATOR] SELECTOR_SOURCE: Playwright params.selector`);
-          } else {
-            // PRIORITY 3: Look for bracket notation from "waiting for locator(...)\" pattern
-            const waitingMatch = cleanedErrorText.match(/waiting for\s+locator\s*\(\s*([^)]+)\)/i);
-            if (waitingMatch && waitingMatch[1]) {
-              let candidate = waitingMatch[1].trim();
-              if ((candidate.startsWith('"') && candidate.endsWith('"')) || (candidate.startsWith('\'') && candidate.endsWith('\''))) {
-                candidate = candidate.slice(1, -1);
-              }
-              failedSelector = candidate.trim();
-              console.log(`[ORCHESTRATOR] ✓ PRIORITY 3 - bracket notation: ${failedSelector}`);
-            }
+          }
+        }
+
+        // PRIORITY 3: step title or any locator('...') occurrences (conservative)
+        if (!failedSelector) {
+          const titleLocatorMatch = cleanedErrorText.match(/locator\s*\(\s*(["'`])([^\)]+?)\1\s*\)/i);
+          if (titleLocatorMatch && titleLocatorMatch[2] && isValidSelector(titleLocatorMatch[2])) {
+            failedSelector = titleLocatorMatch[2].trim();
+            console.log(`ACTUAL_FAILED_SELECTOR=${failedSelector}`);
+            console.log(`FAILED_SELECTOR_SOURCE=step_title_locator`);
+            console.log(`[ORCHESTRATOR] ✓ PRIORITY 3 - step title locator: ${failedSelector}`);
+          }
+        }
+
+        // PRIORITY 4: lastReachedLocator from execution - only as last resort
+        if (!failedSelector) {
+          const lastReached = (result as any).lastReachedLocator;
+          if (lastReached && isValidSelector(lastReached)) {
+            failedSelector = lastReached;
+            console.log(`ACTUAL_FAILED_SELECTOR=${failedSelector}`);
+            console.log(`FAILED_SELECTOR_SOURCE=execution_lastReachedLocator`);
+            console.log(`[ORCHESTRATOR] ✓ PRIORITY 4 - execution lastReachedLocator (fallback): ${failedSelector}`);
           }
         }
         
@@ -405,24 +434,55 @@ Always follow this sequence:
       console.log(`  - Failed Selector: ${failedSelector}`);
       console.log(`  - Target URL: ${targetUrl}`);
 
+      // Diagnostic: surface the selector being used by the healing pipeline
+      console.log(`[ORCHESTRATOR] HEALING_PIPELINE_SELECTOR: ${failedSelector}`);
+
       // Call heal_test tool (TASK 1: Pass correct failed selector)
       console.log(`[ORCHESTRATOR] ========== CALLING heal_test ==========`);
       console.log(`[ORCHESTRATOR] ORIGINAL_SELECTOR: ${failedSelector}`);
       console.log(`[ORCHESTRATOR] TARGET_URL: ${targetUrl}`);
       console.log(`[ORCHESTRATOR] ERROR_SUMMARY: ${errorMessage.substring(0, 150)}`);
       console.log(`[ORCHESTRATOR] ==========================================`);
-      
-      const healResult = await tools[2].func({
-        testFile,
-        errorMessage: errorMessage.substring(0, 500), // Limit error message
-        failedSelector: failedSelector,
-        targetUrl: targetUrl,
-        errorObject: result, // Pass the full execution result object for deep extraction
-      });
 
-      const healData = JSON.parse(healResult as string);
-      logger.info(`[Agent Decision] heal_test returned: ${JSON.stringify(healData)}`);
-      
+      // FAST PATH attempt: try deterministic healing quickly (no MCP/LLM)
+      const tHealStart = Date.now();
+      let mcpTime = 0;
+      let llmTime = 0;
+      let retryTime = 0;
+      let fastPathCandidate: { selector: string; confidence: number } | null = null;
+      try {
+        const simpleSelectorPattern = /^(?:\[[^=]+=['"][^'"]+['"]\]|#[\w\-]+|\.[\w\-\.]+)$/;
+        if (failedSelector && simpleSelectorPattern.test(failedSelector)) {
+          fastPathCandidate = await fastPathHeal(failedSelector, targetUrl || 'about:blank');
+          if (fastPathCandidate) console.log(`[ORCHESTRATOR] FastPath candidate: ${fastPathCandidate.selector} (confidence=${fastPathCandidate.confidence})`);
+          else console.log('[ORCHESTRATOR] FastPath: no candidate found');
+        }
+      } catch (e) {
+        console.warn('[ORCHESTRATOR] FastPath error', e);
+        fastPathCandidate = null;
+      }
+
+      // If fast path found a candidate, short-circuit without MCP/LLM
+      let healData: any = null;
+      if (fastPathCandidate && fastPathCandidate.selector) {
+        healData = { fixed: true, newSelector: fastPathCandidate.selector, action: 'fast_path', confidence: fastPathCandidate.confidence };
+        logger.info('[ORCHESTRATOR] FastPath success - skipping MCP/LLM');
+      } else {
+        const tMcpStart = Date.now();
+        const healResult = await tools[2].func({
+          testFile,
+          errorMessage: errorMessage.substring(0, 500), // Limit error message
+          failedSelector: failedSelector,
+          targetUrl: targetUrl,
+          errorObject: result, // Pass the full execution result object for deep extraction
+        });
+        const tMcpEnd = Date.now();
+        mcpTime = tMcpEnd - tMcpStart;
+        healData = JSON.parse(healResult as string);
+        logger.info(`[Agent Decision] heal_test returned: ${JSON.stringify(healData)}`);
+        console.log(`[ORCHESTRATOR] heal_test duration: ${mcpTime}ms`);
+      }
+
       // TASK 1: Console logging for result handling
       console.log(`[ORCHESTRATOR] Heal Result:`, JSON.stringify(healData, null, 2));
 
@@ -434,6 +494,14 @@ Always follow this sequence:
         // FIX 6: Log failed selection
         console.log(`[ORCHESTRATOR] HEALING_FAILURE: No candidates found or MCP unavailable`);
         healed = false;
+        // Metrics
+        try {
+          const tNow = Date.now();
+          const total = tNow - tHealStart;
+          console.log(`[ORCHESTRATOR] METRICS HEALING_TOTAL_MS=${total} MCP_TIME_MS=${mcpTime} LLM_TIME_MS=${llmTime} RETRY_TIME_MS=${retryTime}`);
+        } catch (e) {
+          /* ignore */
+        }
         return createResult(result, healed, reused);
       }
 
@@ -469,10 +537,13 @@ Always follow this sequence:
         console.log(`[ORCHESTRATOR] HEALING SELECTOR: ${healData.newSelector}`);
         console.log(`[ORCHESTRATOR] ==========================================`);
         
+        const tRetryStart = Date.now();
         result = await executorService.executeTest(testFile, { 
           overrideSelector: healData.newSelector,
           failedLocator: failedSelector,  // Pass the actual failed locator
         });
+        const tRetryEnd = Date.now();
+        retryTime = tRetryEnd - tRetryStart;
         logger.info(`[Agent Decision] run_test (retry) returned: status=${result.status}`);
         
         console.log(`[ORCHESTRATOR] Retry result: ${result.status}`);
@@ -501,13 +572,27 @@ Always follow this sequence:
               strategy: healData.action || 'automatic_healing',
             },
           };
+          // Metrics logging
+          try {
+            const tNow = Date.now();
+            const total = tNow - tHealStart;
+            console.log(`[ORCHESTRATOR] METRICS HEALING_TOTAL_MS=${total} MCP_TIME_MS=${mcpTime} LLM_TIME_MS=${llmTime} RETRY_TIME_MS=${retryTime}`);
+          } catch (e) {
+            /* ignore */
+          }
           return healedResult;
         } else {
           logger.warn(`⚠️ [Agent] Test still failing after healing attempt`);
           logger.warn(`   Healing was attempted but retry did not pass`);
           console.warn(`[ORCHESTRATOR] ⚠️  Retry failed after healing - healing did not help`);
           healed = false;  // Healing failed because retry did not pass
-          return createResult(result, healed, reused);
+            // Metrics logging for failed retry
+            try {
+              const tNow = Date.now();
+              const total = tNow - tHealStart;
+              console.log(`[ORCHESTRATOR] METRICS HEALING_TOTAL_MS=${total} MCP_TIME_MS=${mcpTime} LLM_TIME_MS=${llmTime} RETRY_TIME_MS=${retryTime}`);
+            } catch (e) { /* ignore */ }
+            return createResult(result, healed, reused);
         }
       }
     }

@@ -82,13 +82,14 @@ export function findSimilarCandidates(failedSelector: string): SimilarCandidate[
     const attrName = attrMatch[1];
     const attrValue = attrMatch[2];
     
-    // CANDIDATE 1: Exact attribute name with corrected value
-    // Example: [name="asdfpassword"] -> [name="password"]
-    const correctedValue = correctAttributeValue(attrValue);
-    if (correctedValue !== attrValue) {
+    // CANDIDATE 1: Exact attribute name with normalized value
+    // Example: [name="UserName "] -> [name="username"]
+    const normalizedValue = normalizeAttributeValue(attrValue);
+    if (normalizedValue !== attrValue) {
+      const sim = calculateStringSimilarity(String(attrValue).toLowerCase(), String(normalizedValue).toLowerCase());
       candidates.push({
-        selector: `[${attrName}="${correctedValue}"]`,
-        similarity: 95,
+        selector: `[${attrName}="${normalizedValue}"]`,
+        similarity: Math.round(sim),
         type: 'attribute',
       });
     }
@@ -143,12 +144,12 @@ export function findSimilarCandidates(failedSelector: string): SimilarCandidate[
         type: 'role',
       });
       
-      // Try corrected versions of the name (remove common typo prefixes)
-      const corrected = correctAttributeValue(extractedName);
-      if (corrected !== extractedName) {
+      // Try normalized versions of the name
+      const normalizedName = normalizeAttributeValue(extractedName);
+      if (normalizedName !== extractedName) {
         candidates.push({
-          selector: `getByRole("${role}", { name: /${corrected}/i })`,
-          similarity: calculateStringSimilarity(extractedName, corrected) * 0.95,
+          selector: `getByRole("${role}", { name: /${normalizedName}/i })`,
+          similarity: calculateStringSimilarity(extractedName, normalizedName) * 0.95,
           type: 'role',
         });
       }
@@ -163,28 +164,23 @@ export function findSimilarCandidates(failedSelector: string): SimilarCandidate[
  * Correct common attribute value typos
  * Example: "asdfpassword" -> "password"
  */
-function correctAttributeValue(value: string): string {
-  // Remove prefixes that look like typos
-  const patterns = [
-    { pattern: /^asdf/, replacement: '' },  // asdfpassword -> password
-    { pattern: /^qwerty/, replacement: '' }, // qwertyfield -> field
-    { pattern: /^test/, replacement: '' },  // testEmail -> Email
-    { pattern: /^demo/, replacement: '' },  // demoUsername -> Username
-    { pattern: /^tmp/, replacement: '' },   // tmpPassword -> Password
-    { pattern: /^xxx/, replacement: '' },   // xxxLogin -> Login
-    { pattern: /^abc/, replacement: '' },   // abcEmail -> Email
-  ];
-  
-  for (const { pattern, replacement } of patterns) {
-    if (pattern.test(value)) {
-      const corrected = value.replace(pattern, replacement);
-      if (corrected.length > 2) {
-        return corrected;
-      }
-    }
-  }
-  
-  return value;
+/**
+ * Normalize attribute/text values in a generic way.
+ * - Lowercase
+ * - Trim whitespace
+ * - Remove surrounding quotes
+ * - Collapse multiple spaces
+ */
+function normalizeAttributeValue(value: string): string {
+  if (value === null || value === undefined) return '';
+  let v = String(value);
+  // Remove surrounding quotes
+  v = v.replace(/^['\"]|['\"]$/g, '');
+  // Collapse whitespace and trim
+  v = v.replace(/\s+/g, ' ').trim();
+  // Lowercase for normalized comparison
+  v = v.toLowerCase();
+  return v;
 }
 
 /**

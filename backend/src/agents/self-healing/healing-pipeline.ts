@@ -76,6 +76,7 @@ export interface HealingTelemetry {
 
 export async function healFailure(input: HealFailureInput): Promise<HealFailureOutput & { telemetry: HealingTelemetry }> {
   const start = Date.now();
+  console.log('HEALING_ENTRY: healFailure', { step: input.step, selector: input.selector, url: input.url });
   const recommender = new FixRecommender();
   const healingCategory = classifyPlaywrightError(input.error);
   const actualAPI = detectPlaywrightAPI(input.error || '');
@@ -132,6 +133,8 @@ export async function healFailure(input: HealFailureInput): Promise<HealFailureO
   }
   // Step 2: Strict mode healing
   else if (healingCategory === 'STRICT_MODE_VIOLATION') {
+    console.log('[HEALING-PIPELINE] CALLING_RECOMMENDER (STRICT_MODE_VIOLATION) selector=%s', input.selector);
+    console.log('HEALING_LOG: invoking suggestAlternativeSelector (STRICT_MODE_VIOLATION)');
     const fix = await recommender.suggestAlternativeSelector(
       input.error,
       input.selector,
@@ -153,6 +156,8 @@ export async function healFailure(input: HealFailureInput): Promise<HealFailureO
   }
   // Step 4: Timeout waiting (non-navigation) — attempt healing
   else if (healingCategory === 'TIMEOUT_WAITING') {
+    console.log('[HEALING-PIPELINE] CALLING_RECOMMENDER (TIMEOUT_WAITING) selector=%s', input.selector);
+    console.log('HEALING_LOG: invoking suggestAlternativeSelector (TIMEOUT_WAITING)');
     const fix = await recommender.suggestAlternativeSelector(
       input.error,
       input.selector,
@@ -174,6 +179,8 @@ export async function healFailure(input: HealFailureInput): Promise<HealFailureO
   }
   // Step 5: Visibility healing
   else if (healingCategory === 'ELEMENT_NOT_VISIBLE') {
+    console.log('[HEALING-PIPELINE] CALLING_RECOMMENDER (ELEMENT_NOT_VISIBLE) selector=%s', input.selector);
+    console.log('HEALING_LOG: invoking suggestAlternativeSelector (ELEMENT_NOT_VISIBLE)');
     const fix = await recommender.suggestAlternativeSelector(
       input.error,
       input.selector,
@@ -193,7 +200,9 @@ export async function healFailure(input: HealFailureInput): Promise<HealFailureO
       fixed = false;
       confidence = 0;
       retryCount = 0;
-    } else {
+      } else {
+      console.log('[HEALING-PIPELINE] CALLING_RECOMMENDER (ELEMENT_NOT_FOUND) selector=%s', input.selector);
+      console.log('HEALING_LOG: invoking suggestAlternativeSelector (ELEMENT_NOT_FOUND)');
       const fix = await recommender.suggestAlternativeSelector(
         input.error,
         input.selector,
@@ -209,6 +218,8 @@ export async function healFailure(input: HealFailureInput): Promise<HealFailureO
   }
   // Step 7: Frame context mismatch
   else if (healingCategory === 'FRAME_CONTEXT_MISMATCH') {
+    console.log('[HEALING-PIPELINE] CALLING_RECOMMENDER (FRAME_CONTEXT_MISMATCH) selector=%s', input.selector);
+    console.log('HEALING_LOG: invoking suggestAlternativeSelector (FRAME_CONTEXT_MISMATCH)');
     const fix = await recommender.suggestAlternativeSelector(
       input.error,
       input.selector,
@@ -223,6 +234,8 @@ export async function healFailure(input: HealFailureInput): Promise<HealFailureO
   }
   // Step 8: Unknown
   else {
+    console.log('[HEALING-PIPELINE] CALLING_RECOMMENDER (UNKNOWN) selector=%s', input.selector);
+    console.log('HEALING_LOG: invoking suggestAlternativeSelector (UNKNOWN)');
     const fix = await recommender.suggestAlternativeSelector(
       input.error,
       input.selector,
@@ -235,6 +248,8 @@ export async function healFailure(input: HealFailureInput): Promise<HealFailureO
     confidence = 40;
     retryCount = 1;
   }
+
+  console.log('HEALING_EXIT: healFailure returning', { fixed, healedLocator, reason, telemetry: { healingCategory, confidence, retryCount } });
 
   const executionTime = Date.now() - start;
   const telemetry: HealingTelemetry = {
