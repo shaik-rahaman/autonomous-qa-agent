@@ -1,5 +1,15 @@
 # Enterprise Agentic AI Platform
 
+# Enterprise Agentic AI Platform
+
+### Reference Implementation: Autonomous Quality Engineering
+
+<p align="center">
+  <img src="architecture/enterprise-agentic-ai-platform.png" width="100%">
+</p>
+
+> **An enterprise-grade Agentic AI platform...
+
 ### Reference Implementation: Autonomous Quality Engineering
 
 > **An enterprise-grade Agentic AI platform that transforms natural language business requirements into autonomous workflows using AI agents, LLM orchestration, Retrieval-Augmented Generation (RAG), Browser Intelligence, and Intelligent Execution Pipelines.**
