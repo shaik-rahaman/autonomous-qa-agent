@@ -26,4 +26,36 @@ The architecture has been designed to be modular and extensible, enabling future
 * 📊 Intelligent Execution Reports
 * ☁️ Production Deployment on Oracle Cloud
 
+---
 
+---
+
+# 📸 Platform Showcase
+
+## Dashboard
+
+![Dashboard](screenshots/dashboard.png)
+
+## Gherkin Generation
+
+![Gherkin](screenshots/Gherkin-script.png)
+
+## Playwright Test Generation
+
+![Playwright Script](screenshots/playwright-script.png)
+
+## Test Execution
+
+![Execution](screenshots/test-execution.png)
+
+## Execution Logs
+
+![Execution Logs](screenshots/execution-lab.png)
+
+## Self-Healing
+
+![Self-Healing](screenshots/healinglab.png)
+
+## Test Results
+
+![Test Results](screenshots/test-result.png)
