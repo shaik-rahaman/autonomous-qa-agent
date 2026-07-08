@@ -69,3 +69,9 @@ The architecture has been designed to be modular and extensible, enabling future
 ## Test Results
 
 ![Test Results](screenshots/test-result.png)
+
+## 📄 Case Study
+
+A one-page overview of the Autonomous QA Agent architecture, workflow, business value, and technology stack.
+
+📄 Autonomous_QA_Agent_Case_Study_Professional.pdf
