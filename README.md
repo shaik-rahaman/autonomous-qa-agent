@@ -1,8 +1,14 @@
 # Enterprise Agentic AI Platform
 
-### AI Quality Engineering Reference Implementation
+### Reference Implementation: Autonomous QA Agent
 
 > **An enterprise-grade Agentic AI platform that transforms natural language business requirements into autonomous workflows using AI agents, LLM orchestration, Retrieval-Augmented Generation (RAG), Browser Intelligence, and Intelligent Execution Pipelines.**
+
+### Overview
+
+This repository showcases an **Agentic AI-powered Autonomous QA Agent** that transforms Jira user stories into executable Playwright tests, performs intelligent execution, AI-assisted locator self-healing using Playwright MCP, and generates actionable execution reports.
+
+It serves as a reference implementation of an enterprise AI Quality Engineering platform built using **LLMs, LangChain, LangGraph, RAG, Playwright MCP, DeepEval, TypeScript, and Python**.
 
 ---
 
@@ -10,9 +16,10 @@
 
 | Resource | Link |
 |----------|------|
-| 📄 Case Study | [Autonomous QA Agent Case Study](docs/CASE_STUDY.md) |
+| 💻 GitHub Repository | [Repository](https://github.com/shaik-rahaman/autonomous-qa-agent) |
+| 📄 Case Study | [Read Online](docs/CASE_STUDY.md) |
 | 📥 Professional PDF | [Download PDF](docs/Autonomous_QA_Agent_Case_Study_Professional.pdf) |
-| 🌐 Live Demo | http://autonomousqa.ddns.net/ |
+| 🌐 Live Demo | [Launch Demo](http://autonomousqa.ddns.net/) |
 
 ---
 
