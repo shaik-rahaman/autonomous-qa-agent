@@ -1,38 +1,73 @@
 # Enterprise Agentic AI Platform
 
-### Reference Implementation: Autonomous Quality Engineering
-
-<p align="center">
-  <img src="architecture/enterprise-agentic-ai-platform.png" width="100%">
-</p>
-
-> **An enterprise-grade Agentic AI platform...
+### AI Quality Engineering Reference Implementation
 
 > **An enterprise-grade Agentic AI platform that transforms natural language business requirements into autonomous workflows using AI agents, LLM orchestration, Retrieval-Augmented Generation (RAG), Browser Intelligence, and Intelligent Execution Pipelines.**
 
 ---
 
-## 🚀 Reference Implementation
+## 📖 Documentation
 
-This repository demonstrates the platform through an **Autonomous Quality Engineering** solution that converts natural language requirements into executable Playwright automation, intelligently executes tests, detects failures, performs AI-assisted self-healing, and produces actionable execution insights.
+| Resource | Link |
+|----------|------|
+| 📄 Case Study | [Autonomous QA Agent Case Study](docs/CASE_STUDY.md) |
+| 📥 Professional PDF | [Download PDF](docs/Autonomous_QA_Agent_Case_Study_Professional.pdf) |
+| 🌐 Live Demo | http://autonomousqa.ddns.net/ |
 
-The architecture has been designed to be modular and extensible, enabling future enterprise AI agents across multiple business domains including Customer Support, Healthcare, Finance, DevOps, Compliance, and Intelligent Document Processing.
+---
+
+## 🏗️ Enterprise Architecture
+
+<p align="center">
+  <img src="architecture/enterprise-agentic-ai-platform.png" width="100%">
+</p>
 
 ---
 
-## ✨ Core Capabilities
+# 🚀 Reference Implementation
 
-* 🤖 Agentic AI & Multi-Agent Orchestration
-* 🧠 LLM Orchestration & Prompt Engineering
-* 📚 Retrieval-Augmented Generation (RAG)
-* 🎭 Natural Language → Playwright Test Generation
-* 🔄 Autonomous Test Execution
-* 🛠 AI-Assisted Self-Healing
-* 🌐 Browser Intelligence using MCP
-* 📊 Intelligent Execution Reports
-* ☁️ Production Deployment on Oracle Cloud
+This repository demonstrates an **Autonomous QA Agent** built on the Enterprise Agentic AI Platform.
+
+The solution converts natural language requirements into executable Playwright automation, intelligently executes tests, detects failures, performs AI-assisted locator self-healing using Playwright MCP, and generates execution reports.
+
+The platform has been designed to be modular and extensible, enabling future AI agents across multiple business domains including:
+
+- Customer Support
+- Healthcare
+- Finance
+- DevOps
+- Compliance
+- Intelligent Document Processing
 
 ---
+
+# ✨ Core Capabilities
+
+- 🤖 Agentic AI & Multi-Agent Orchestration
+- 🧠 LLM Orchestration
+- 📚 Retrieval-Augmented Generation (RAG)
+- 🎭 Natural Language → Playwright Test Generation
+- 🔄 Autonomous Test Execution
+- 🛠 AI-Assisted Locator Self-Healing
+- 🌐 Browser Intelligence using Playwright MCP
+- 📊 Intelligent Execution Reporting
+- ☁️ Cloud Deployment
+
+---
+
+# 🛠️ Technology Stack
+
+| Area | Technologies |
+|------|--------------|
+| AI | Agentic AI, LLMs |
+| Orchestration | LangChain, LangGraph |
+| Retrieval | RAG |
+| Browser Automation | Playwright, Playwright MCP |
+| Languages | TypeScript, Python |
+| Runtime | Node.js |
+| Evaluation | DeepEval |
+| Deployment | Oracle Cloud |
+| Version Control | GitHub |
 
 ---
 
@@ -42,34 +77,76 @@ The architecture has been designed to be modular and extensible, enabling future
 
 ![Dashboard](screenshots/dashboard.png)
 
+---
+
 ## Gherkin Generation
 
 ![Gherkin](screenshots/Gherkin-script.png)
+
+---
 
 ## Playwright Test Generation
 
 ![Playwright Script](screenshots/playwright-script.png)
 
+---
+
 ## Test Execution
 
 ![Execution](screenshots/test-execution.png)
+
+---
 
 ## Execution Logs
 
 ![Execution Logs](screenshots/execution-lab.png)
 
-## Self-Healing
+---
+
+## AI-Assisted Self-Healing
 
 ![Self-Healing](screenshots/healinglab.png)
+
+---
 
 ## Test Results
 
 ![Test Results](screenshots/test-result.png)
 
-## 📖 Documentation
+---
 
-- 📄 **Case Study:** [Autonomous QA Agent Case Study](docs/CASE_STUDY.md)
+# 🎯 Business Value
 
-- 📥 **Download PDF:** [Professional Case Study](docs/Autonomous_QA_Agent_Case_Study_Professional.pdf)
+The Autonomous QA Agent helps engineering teams:
 
-- 🌐 **Live Demo:** http://autonomousqa.ddns.net/
+- Reduce manual automation maintenance
+- Improve regression stability
+- Accelerate software delivery
+- Reduce flaky UI test failures
+- Improve engineering productivity
+- Increase confidence in CI/CD pipelines
+
+---
+
+# 🔗 Related AI Projects
+
+- AI Test Case Generation using RAG *(Coming Soon)*
+- LLM Evaluation Framework *(Coming Soon)*
+
+---
+
+# 👨‍💻 Author
+
+**Khaleelur Rahaman**
+
+AI Quality Engineering Leader
+
+Ex-SAP Ariba | Yahoo
+
+LinkedIn: https://www.linkedin.com/in/shaikrahaman/
+
+GitHub: https://github.com/shaik-rahaman
+
+---
+
+> **This repository demonstrates how Agentic AI, Large Language Models, Retrieval-Augmented Generation (RAG), and browser automation can be combined to build enterprise-grade AI Quality Engineering solutions.**
